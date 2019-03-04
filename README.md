@@ -1,4 +1,4 @@
-Tools for Ensemble Kalman Inversion (EnKI) and Gaussian Process
+Tools for Ensemble Kalman Inversion (EKI) and Gaussian Process
 Emulation for Uncertainty Quantification (GP-UQ).
 
 References:

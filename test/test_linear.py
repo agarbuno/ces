@@ -3,7 +3,7 @@ import numpy as np
 import sys
 sys.path.append('../src')
 
-from enki import EnKI
+from eki import EKI
 
 def error(u, u_t):
     N = u.shape[0]
@@ -32,7 +32,7 @@ def enki_run(J=100, n=5, r=0.1):
     diff = 1
     err_prev = 0
     while diff > 0.000000001:
-        u_ens = EnKI(u_ens, g_ens, g_t, cov)
+        u_ens = EKI(u_ens, g_ens, g_t, cov)
         err = error(u_ens.mean(0), u_t)
         if iter == iter_max: break
         iter += 1

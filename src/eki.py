@@ -3,7 +3,7 @@ import numpy as np
 # u: parameters
 # g: data, i.e. g(u)
 # g_t: measurement mean, i.e. y = g_t + N(0, cov)
-def EnKI(u, g, g_t, cov):
+def EKI(u, g, g_t, cov):
 
     # Ensemble size
     J = u.shape[0]
