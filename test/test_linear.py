@@ -5,11 +5,7 @@ sys.path.append('../src')
 
 from eki import EKI
 
-def error(u, u_t):
-    N = u.shape[0]
-    return np.sqrt(np.sum((u - u_t)**2) / N)
-
-def enki_run(J=100, n=5, r=0.1):
+def eki_run(J=100, n=5, r=0.1):
 
     # Maximum iterations
     iter_max = 1000
@@ -27,19 +23,24 @@ def enki_run(J=100, n=5, r=0.1):
 
     # Covariance -- no noise
     cov = np.zeros((n,n))
-    
-    iter = 0
-    diff = 1
-    err_prev = 0
-    while diff > 0.000000001:
-        u_ens = EKI(u_ens, g_ens, g_t, cov)
-        err = error(u_ens.mean(0), u_t)
-        if iter == iter_max: break
-        iter += 1
-        diff = abs(err-err_prev)
-        err_prev = err
 
-    return iter, err
+    # Ensemble Kalman Inversion object
+    eki = EKI(u_ens, g_t, cov)
+    
+    # Iterate
+    iter = 0
+    while iter < iter_max:
+
+        eki.update(g_ens)
+        eki.compute_error()
+        if eki.error[-1] < 1e-10: break
+
+        # New model evaluations
+        u_ens = eki.get_u()
+        g_ens = np.array([A.dot(u) for u in u_ens])
+        iter += 1
+
+    return iter, eki.error[-1]
 
 # J: ensemble size
 # n: number of parameters
@@ -48,6 +49,8 @@ def test_no_noise():
     J = 100
     n = 5
     r = 0.1
-    iter, err = enki_run(J=J, n=n, r=r)
+    iter, err = eki_run(J=J, n=n, r=r)
     assert iter == 1
     assert err < 0.1
+
+test_no_noise()

@@ -2,11 +2,8 @@ import sys
 sys.path.append('../src')
 import numpy as np
 from eki import EKI
+import matplotlib.pyplot as plt
 
-def error(u, u_t):
-    N = u.shape[0]
-    return np.sqrt(np.sum((u - u_t)**2) / N)
-    
 def main():
 
     # Maximum iterations
@@ -37,17 +34,18 @@ def main():
     u_ens = np.random.normal(loc=0, scale=2, size=J*n).reshape(J,n)
     g_ens = np.array([A.dot(u) for u in u_ens])
 
-    # Ensemble Kalman Inversion
+    # Ensemble Kalman Inversion object
+    eki = EKI(u_ens, g_t, cov)
+    
+    # Iterate
     iter = 0
-    diff = 1
-    err_prev = 0
-    while diff > 0.000000001:
-        u_ens = EKI(u_ens, g_ens, g_t, cov)
-        err = error(u_ens.mean(0), u_t)
-        if iter == iter_max: break
+    while iter < iter_max:
+        eki.update(g_ens)
+        eki.compute_error()
+        if eki.error[-1] < 0.01: break
         iter += 1
-        diff = abs(err-err_prev)
-        err_prev = err
+        u_ens = eki.get_u()
+        g_ens = np.array([A.dot(u) for u in u_ens])
 
     print('')
     if iter == 1:
@@ -59,11 +57,15 @@ def main():
     print('Mean parameters')
     print(u_ens.mean(0))
     print('')
-    print('Truth')
+    print('Truth parameters')
     print(u_t)
     print('')
     print('Error')
-    print(err)
+    print(eki.error[-1])
     print('')
+
+    eki.plot_error()
+    plt.show()
+    
     
 main()
