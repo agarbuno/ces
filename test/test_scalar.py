@@ -44,11 +44,10 @@ def eki_run(J=100, n=5):
 
 # J: ensemble size
 # n: number of parameters
-# r: rescale covariance
 def test_no_noise():
     J = 100
     n = 5
-    iter, err = eki_run(J=J, n=n)
+    iter, err = eki_run(J=J, n=1)
     assert iter == 1
     assert err < 0.1
 

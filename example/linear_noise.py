@@ -19,19 +19,19 @@ def main():
     r = 0.01
     
     # Linear operator
-    A = np.random.normal(loc=0, scale=2, size=n*n).reshape((n,n))
+    A = np.random.normal(loc=0, scale=2, size=(n,n))
 
     # Truth
     u_t = np.random.normal(loc=0, scale=3, size=n)
     g_t = A.dot(u_t)
 
     # Covariance -- positive definite and rescale
-    cov = np.random.normal(loc=0, scale=2, size=n*n).reshape((n,n))
+    cov = np.random.normal(loc=0, scale=2, size=(n,n))
     cov = cov.T.dot(cov)
     cov *= r*r
     
     # Generate ensembles
-    u_ens = np.random.normal(loc=0, scale=2, size=J*n).reshape(J,n)
+    u_ens = np.random.normal(loc=0, scale=2, size=(J,n))
     g_ens = np.array([A.dot(u) for u in u_ens])
 
     # Ensemble Kalman Inversion object
@@ -66,6 +66,5 @@ def main():
 
     eki.plot_error()
     plt.show()
-    
-    
+
 main()
