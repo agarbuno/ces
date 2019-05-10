@@ -1,7 +1,7 @@
 Tools for Ensemble Kalman Inversion (EKI) and Gaussian Process
 Emulation for Uncertainty Quantification (GP-UQ).
 
-**Note**: Examples are added as jupyter notebooks. 
+**Note**: Examples can be found as jupyter notebooks. 
 
 Dependencies: 
 - numpy
