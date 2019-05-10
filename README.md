@@ -1,6 +1,12 @@
 Tools for Ensemble Kalman Inversion (EKI) and Gaussian Process
 Emulation for Uncertainty Quantification (GP-UQ).
 
+**Note**: Examples are added as jupyter notebooks. 
+
+Dependencies: 
+- numpy
+- gpflow
+
 References:
 
 Iglesias et al. Ensemble Kalman methods for inverse problems. Inverse

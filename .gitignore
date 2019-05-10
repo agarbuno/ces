@@ -4,3 +4,4 @@
 **/.pytest_cache
 *.pdf
 *.pickle
+*.DS_Store
