@@ -15,11 +15,12 @@ class eki(object):
 		self.p = p                # Dimensionality of theta (parameters)
 		self.J = J                # Number of ensemble particles
 		self.epsilon = 1e-7       # Underflow protection
-		self.T = 30
+		self.T = 30               # Number of maximum iterations
 		self.num_cores = multiprocessing.cpu_count()
 		self.l_window = l_window
 		self.freq = freq
 		self.scaled = False
+		self.parallel = False
 
 	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
 		"""
@@ -108,16 +109,14 @@ class eki(object):
 		return g
 
 	def Gpar(self, theta, model):
-	    Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G)(k, model) for k in theta.T)
-	    return (np.asarray(Geval).T)
-
-	def Gnopar(self, theta, model):
-	    Gs = np.zeros((self.n_obs, self.J))
-
-	    for ii, k in enumerate(theta.T):
-	    	Gs[:, ii] = model(k)
-
-	    return Gs
+		if self.parallel:
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G)(k, model) for k in theta.T)
+			return (np.asarray(Geval).T)
+		else:
+			Gs = np.zeros((self.n_obs, theta.shape[1]))
+			for ii, k in enumerate(theta.T):
+				Gs[:, ii] = model(k)
+			return Gs
 
 	def G_pde(self, k, model, t):
 		r, b = k[:self.p]
@@ -220,14 +219,16 @@ class flow(eki):
 
 		    # Compute the update
 		    self.radspec.append(np.linalg.eigvals(D).real.max())
-		    hk = 1./(np.linalg.norm(D) + 1e-8)
-		    #hk = 1./self.radspec[-1]
+		    #hk = 1./(np.linalg.norm(D) + 1e-8)
+		    hk = 1./self.radspec[-1]
+		    #hk = 0.01
+
 		    if i == 0:
 		    	self.t.append(hk)
 		    else:
 		    	self.t.append(hk + self.t[-1])
 		    Umean = U0.mean(axis = 1)[:, np.newaxis]
-		    Ucov  = np.cov(U0)
+		    Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
 		    Ustar = np.linalg.solve(np.eye(self.p) + hk/(self.sigma**2) * Ucov,
 		    	U0 - hk * np.matmul(U0 - Umean, D) + hk/(self.sigma**2) * np.matmul(Ucov, self.mu))
@@ -235,6 +236,9 @@ class flow(eki):
 
 		    self.Uall.append(Uk)
 		    U0 = Uk
+
+		    if self.t[-1] > 2:
+		    	break
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
@@ -271,7 +275,7 @@ class flow(eki):
 		self.t = []
 
 		for i in tqdm(range(self.T), desc = 'Ens.size: %s'%(self.J)):
-		    Geval = self.Gnopar(U0, model)
+		    Geval = self.Gpar(U0, model)
 
 		    # For ensemble update
 		    E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -309,7 +313,7 @@ class flow(eki):
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
-		self.Gstar = self.Gnopar(self.Ustar, model)
+		self.Gstar = self.Gpar(self.Ustar, model)
 
 	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
 		"""
@@ -711,7 +715,7 @@ class iterative(eki):
 		self.t = []
 
 		for i in tqdm(range(self.T)):
-			Geval = self.Gnopar(U0, model)
+			Geval = self.Gpar(U0, model)
 
 			# For ensemble update
 			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -744,7 +748,7 @@ class iterative(eki):
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
-		self.Gstar = self.Gnopar(self.Ustar, model)
+		self.Gstar = self.Gpar(self.Ustar, model)
 
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
 		"""
