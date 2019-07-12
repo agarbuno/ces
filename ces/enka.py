@@ -188,7 +188,8 @@ class eki(object):
 			if not self.scaled:
 				mean_pred, var_pred = model.predict_y(X)
 			else:
-				mean_pred, var_pred = model.predict_y(np.linalg.solve(self.scale_cov, X.T - self.scale_mean).T)
+				mean_pred, var_pred = model.predict_y(np.linalg.solve(self.scale_cov,
+				X.T - self.scale_mean).T)
 			gpmeans[ii,:] = mean_pred.flatten()
 			gpvars[ii,:] = var_pred.flatten()
 
@@ -376,7 +377,7 @@ class flow(eki):
 
 		for i in tqdm(range(self.T)):
 		    Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
-		    self.W0 = Geval[self.n_obs:,:]
+		    # self.W0 = Geval[self.n_obs:,:]
 		    Geval = Geval[:self.n_obs,:]
 
 		    # For ensemble update
@@ -415,7 +416,7 @@ class flow(eki):
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
 		Geval = self.Gpar_pde(np.vstack([self.Ustar, self.W0]), model, t)
-		self.W0 = Geval[self.n_obs:,:]
+		# self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval = Geval[:self.n_obs,:]
 
 
