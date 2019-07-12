@@ -184,7 +184,7 @@ class eki(object):
 		gpmeans = np.empty(shape = (len(self.gpmodels), len(X)))
 		gpvars = np.empty(shape = (len(self.gpmodels), len(X)))
 
-		for ii, model in enumerate(self.gpmodels):
+		for ii, model in tqdm(enumerate(self.gpmodels)):
 			if not self.scaled:
 				mean_pred, var_pred = model.predict_y(X)
 			else:
