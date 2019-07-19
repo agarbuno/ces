@@ -419,7 +419,6 @@ class flow(eki):
 		# self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval = Geval[:self.n_obs,:]
 
-
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
 		"""
 	    Find the minimizer of an inverse problem using the continuous time limit
