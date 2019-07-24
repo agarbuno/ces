@@ -13,7 +13,7 @@ def banana(u, a = 1., b = .5, flag_noise = False):
     y = u2/a - b *(u1**2 + a**2)
     return np.array([x, y]) + flag_noise * np.linalg.cholesky(Gamma).dot(np.random.normal(0, 1, [2,]))
 
-def elliptic(u, x1 = 1./4, x2 = 3./4, dG = False, flag_noise = True, noise = 0.05):
+def elliptic(u, x1 = 1./4, x2 = 3./4, dG = False, flag_noise = True, noise = 0.1):
     u1, u2 = u
     x = (u2 * x1) + (np.exp(-u1) * (-x1**2+x1) * 0.5) + (flag_noise * noise * np.random.normal())
     y = (u2 * x2) + (np.exp(-u1) * (-x2**2+x2) * 0.5) + (flag_noise * noise * np.random.normal())
@@ -41,7 +41,7 @@ def lorenz2d(w, t0, r = 28., b = 8./3):
 	x_dot, y_dot, z_dot = lorenz(w, t0, 10., r, b)
 	return [x_dot, y_dot, z_dot]
 
-def lorenz96(X, t, h, F, c, b):
+def lorenz96_rhs(X, t, h, F, c, b):
     n_slow = 36       # Slow variables
     n_fast = 10       # Fast variables
 
@@ -75,6 +75,23 @@ def lorenz96_ivp(t, X, h = 1., F = 10., c = 10., b = 10.):
 
     return np.hstack((dXdt, dYdt))
 
+def lorenz96_dim(t, X, h = 1., F = 10., c = 2**7., b = 1.):
+    n_slow = 36       # Slow variables
+    n_fast = 10       # Fast variables
+
+    Y = X[n_slow:]
+    X = X[:n_slow]
+    dXdt = np.zeros(X.shape)
+    dYdt = np.zeros(Y.shape)
+    for k in range(n_slow):
+        dXdt[k] = -X[k - 1] * (X[k - 2] - X[(k + 1) % n_slow]) - X[k] + F - \
+                    (0.8) * np.mean(Y[k * n_fast: (k + 1) * n_fast])
+    for j in range(n_fast * n_slow):
+        dYdt[j] = - c * Y[(j + 1) % (n_fast * n_slow)] * \
+                       (Y[(j + 2) % (n_fast * n_slow)] - Y[j-1]) - \
+                    c * Y[j] + c * X[int(j / n_fast)]
+
+    return np.hstack((dXdt, dYdt))
 
 def scale_gppreds(gpmeans, gpvars, Gmean, Gstd):
 	"""

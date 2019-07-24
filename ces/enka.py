@@ -175,16 +175,19 @@ class eki(object):
 	def predict_gps(self, X):
 		"""
 		Prediction using independent GP models for multioutput code.
-		Eventually, we either decorrelate or learn a multioutput emulator.
+		Eventually, we will either decorrelate or learn a multioutput emulator.
 
 		Inputs:
-		- gpmodels: list of independent GP models
-		- X: numpy array with dimensions [n_points, d]
+		- gpmodels: list of independent GP models.
+		- X: numpy array with dimensions [n_points, d].
+			- n_points: number of training points.
+			- d: dimensionality of the parameter vector.
 		"""
 		gpmeans = np.empty(shape = (len(self.gpmodels), len(X)))
 		gpvars = np.empty(shape = (len(self.gpmodels), len(X)))
 
-		for ii, model in tqdm(enumerate(self.gpmodels)):
+		#print('Computing GP predictions for every component.')
+		for ii, model in enumerate(self.gpmodels):
 			if not self.scaled:
 				mean_pred, var_pred = model.predict_y(X)
 			else:
@@ -193,6 +196,7 @@ class eki(object):
 			gpmeans[ii,:] = mean_pred.flatten()
 			gpvars[ii,:] = var_pred.flatten()
 
+		#print('Prediction done...\n')
 		return [gpmeans, gpvars]
 
 # ------------------------------------------------------------------------------
