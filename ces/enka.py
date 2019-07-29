@@ -381,7 +381,7 @@ class flow(eki):
 
 		for i in tqdm(range(self.T)):
 		    Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
-		    # self.W0 = Geval[self.n_obs:,:]
+		    self.W0 = Geval[self.n_obs:,:]
 		    Geval = Geval[:self.n_obs,:]
 
 		    # For ensemble update
@@ -420,7 +420,7 @@ class flow(eki):
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
 		Geval = self.Gpar_pde(np.vstack([self.Ustar, self.W0]), model, t)
-		# self.W0 = Geval[self.n_obs:,:]
+		self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval = Geval[:self.n_obs,:]
 
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
