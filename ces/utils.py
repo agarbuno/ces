@@ -70,6 +70,10 @@ class lorenz63(object):
         """
         xs, ys, zs = ws[:,0], ws[:,1], ws[:,2]
         ws = [xs, ys, zs, xs**2, ys**2, zs**2, xs*ys, xs*zs, ys*zs]
+        # With rolling statistics
+        # gs = [np.asarray(pd.Series(k).rolling(window = int(self.l_window * self.freq) ).mean()) for k in ws]
+        # gs = np.asarray(gs)[:,-1]
+        # With adyacent windows
         gs = np.asarray(ws)[:,1:].reshape(self.n_obs, -1,
             int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
         return np.round(gs, 12)
