@@ -53,18 +53,20 @@ class lorenz63(object):
         z_dot = x * y - b * z
         return [x_dot, y_dot, z_dot]
 
-    def solve(self, w0, t):
+    def solve(self, w0, t, args = ()):
         """
         Solve the Lorenz system using the callable object defined in __call__.
         Inputs:
             - w0: [n_state, ] initial conditions
             - t : time vector to collect solution of ODE solver
         """
-        ws = integrate.odeint(self, w0, t)
+        ws = integrate.odeint(self, w0, t, args = args)
         return ws
 
     def statistics(self, ws):
         """
+        Compute the relevant statistics from the output of the solution of the
+        ODE solver
         """
         xs, ys, zs = ws[:,0], ws[:,1], ws[:,2]
         ws = [xs, ys, zs, xs**2, ys**2, zs**2, xs*ys, xs*zs, ys*zs]
