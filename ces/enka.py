@@ -134,16 +134,18 @@ class eki(object):
 		"""
 		Forward model for PDE constrained inverse problem. If parallel is set to
 		true, then it uses the available cores as initialized with the eki object.
-
 		(WARNING): Only used for Lorenz63
 
 		Inputs:
-			- k: [p + n, ], p is the dimensionality of the parameters, n is the
-				dimensionality of the state used as initial conditions for
+			- k: [p + n_state, ], p is the dimensionality of the parameters, n_state
+				is the dimension of the state used as initial conditions for
 				the numerical integrator.
 			- t: [t_eks,], array with computational times to evaluate the numerical
 				integrator.
 			- model: model name for the forward model.
+
+		Outputs:
+			- gs: [n_obs + n_state,] array.
 		"""
 		r, b = k[:self.p]
 		w0 = k[self.p:]
@@ -153,13 +155,13 @@ class eki(object):
 		ws = [xs, ys, zs, xs**2, ys**2, zs**2, xs*ys, xs*zs, ys*zs]
 
 		# With rolling statistics
-		gs = [np.asarray(pd.Series(k).rolling(window = int(self.l_window * self.freq) ).mean()) for k in ws]
-		gs = np.asarray(gs)[:,-1]
+		# gs = [np.asarray(pd.Series(k).rolling(window = int(self.l_window * self.freq) ).mean()) for k in ws]
+		# gs = np.asarray(gs)[:,-1]
 
 		# With adjacent windows
-		# gs = np.array([k[1:].reshape(-1, self.l_window * self.freq).mean(axis = 1) for k in ws])
-		# gs = gs[:,-1]
+		gs = np.asarray(ws)[:,1:].reshape(self.n_obs, -1, int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
 
+		gs = np.round(gs, 12)
 		return np.concatenate([gs, np.asarray([xs[-1], ys[-1], zs[-1]])])
 
 	def Gpar_pde(self, theta, model, t):
@@ -409,7 +411,7 @@ class flow(eki):
 		    Ustar = np.linalg.solve(np.eye(self.p) + hk/(self.sigma**2) * Ucov,
 		    	U0 - hk * np.matmul(U0 - Umean, D) + hk/(self.sigma**2) * np.matmul(Ucov, self.mu))
 		    Uk = np.abs(Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-		    np.random.normal(0, 1, [self.p, self.J])))
+		    	np.random.normal(0, 1, [self.p, self.J])))
 
 		    self.Uall.append(Uk)
 		    U0 = Uk
