@@ -10,15 +10,13 @@ import multiprocessing
 
 class eki(object):
 
-	def __init__(self, p, n_obs, J, l_window = 0, freq = 0):
+	def __init__(self, p, n_obs, J):
 		self.n_obs = n_obs		  # Dimensionality of statistics (observations)
 		self.p = p                # Dimensionality of theta (parameters)
 		self.J = J                # Number of ensemble particles
 		self.epsilon = 1e-7       # Underflow protection
 		self.T = 30               # Number of maximum iterations
 		self.num_cores = multiprocessing.cpu_count()
-		self.l_window = l_window
-		self.freq = freq
 		self.scaled = False
 		self.parallel = False
 
@@ -134,7 +132,7 @@ class eki(object):
 		"""
 		Forward model for PDE constrained inverse problem. If parallel is set to
 		true, then it uses the available cores as initialized with the eki object.
-		(WARNING): Only used for Lorenz63
+		(WARNING): Hope to be more general now! 
 
 		Inputs:
 			- k: [p + n_state, ], p is the dimensionality of the parameters, n_state
@@ -150,19 +148,9 @@ class eki(object):
 		r, b = k[:self.p]
 		w0 = k[self.p:]
 
-		ws = integrate.odeint(model, w0, t, args = (r, b))
-		xs, ys, zs = ws[:,0], ws[:,1], ws[:,2]
-		ws = [xs, ys, zs, xs**2, ys**2, zs**2, xs*ys, xs*zs, ys*zs]
-
-		# With rolling statistics
-		# gs = [np.asarray(pd.Series(k).rolling(window = int(self.l_window * self.freq) ).mean()) for k in ws]
-		# gs = np.asarray(gs)[:,-1]
-
-		# With adjacent windows
-		gs = np.asarray(ws)[:,1:].reshape(self.n_obs, -1, int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
-
-		gs = np.round(gs, 12)
-		return np.concatenate([gs, np.asarray([xs[-1], ys[-1], zs[-1]])])
+		ws = model.solve(w0, t, args = (r, b))
+		gs = model.statistics(ws)
+		return np.concatenate([gs, ws[-1]])
 
 	def Gpar_pde(self, theta, model, t):
 	    Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in theta.T)
