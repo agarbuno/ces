@@ -132,7 +132,7 @@ class eki(object):
 		"""
 		Forward model for PDE constrained inverse problem. If parallel is set to
 		true, then it uses the available cores as initialized with the eki object.
-		(WARNING): Hope to be more general now! 
+		(WARNING): Hope to be more general now!
 
 		Inputs:
 			- k: [p + n_state, ], p is the dimensionality of the parameters, n_state
@@ -140,7 +140,8 @@ class eki(object):
 				the numerical integrator.
 			- t: [t_eks,], array with computational times to evaluate the numerical
 				integrator.
-			- model: model name for the forward model.
+			- model: object that can solve the pde/ode equations and compute its
+				relevant statistics.
 
 		Outputs:
 			- gs: [n_obs + n_state,] array.
