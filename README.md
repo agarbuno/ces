@@ -10,15 +10,15 @@ To import the module into a python script or project, type
 import sys
 sys.path.append('Your path/ipuq/ces/')
 
-from enka import *
-from utils import *
+from ces.utils import *
+from ces.enka import *
 ```
 ---
 
 Overview of this module:
-- `enka` contains the ensemble kalman algorithms.
-- `utils` contains the additional tools for running the examples. Like test functions and
-test ODE and PDE functions to solve the inverse problem through a Bayesian approximation.  
+- `enka` contains the ensemble Kalman algorithms.
+- `utils` contains the additional tools for running the examples. Like test functions,
+PDEs constrained functions to solve the inverse problem through an approximate Bayesian method.  
 
 Coming shortly:
 - MCMC using GPs.
@@ -26,6 +26,8 @@ Coming shortly:
 Dependencies:
 - numpy
 - gpflow
+- scipy
+- pandas
 
 ---
 
