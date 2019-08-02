@@ -146,10 +146,10 @@ class eki(object):
 		Outputs:
 			- gs: [n_obs + n_state,] array.
 		"""
-		r, b = k[:self.p]
+		# r, b = k[:self.p]
 		w0 = k[self.p:]
 
-		ws = model.solve(w0, t, args = (r, b))
+		ws = model.solve(w0, t, args = tuple(k[:self.p]))
 		gs = model.statistics(ws)
 		return np.concatenate([gs, ws[-1]])
 

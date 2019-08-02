@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from scipy import integrate
 
 def banana(u, a = 1., b = .5, flag_noise = False):
@@ -26,7 +27,15 @@ def elliptic(u, x1 = 1./4, x2 = 3./4, dG = False, flag_noise = True, noise = 0.1
     	return [x,y]
 
 class lorenz63(object):
-    '''Lorenz '63 model'''
+    """
+    Lorenz 63 model. PDE model structure:
+        - init: to initialize the object
+        - call: make the object be a function. This could allow the model to be
+            used in a reduced way.
+        - model: RHS of the ode system.
+        - solve: here we define the method we need to solve the model.
+        - statistics: here we define the relevant statistics to be computed.
+    """
     def __init__(self, l_window = 10, freq = 100):
         """
         Lorenz 63 model initilization
@@ -38,7 +47,9 @@ class lorenz63(object):
 
     def __call__(self, w, t, r = 28., b = 8./3):
         """
-        Reduced Lorenz 63 model with 2 parameters
+        Reduced Lorenz 63 model with 2 parameters.
+        (WARNING): This should be edited somehow to be able to reduce the model
+                in an arbitrary way.
         """
         x_dot, y_dot, z_dot = self.model(w, t, 10., r, b)
         return [x_dot, y_dot, z_dot]
@@ -71,12 +82,12 @@ class lorenz63(object):
         xs, ys, zs = ws[:,0], ws[:,1], ws[:,2]
         ws = [xs, ys, zs, xs**2, ys**2, zs**2, xs*ys, xs*zs, ys*zs]
         # With rolling statistics
-        # gs = [np.asarray(pd.Series(k).rolling(window = int(self.l_window * self.freq) ).mean()) for k in ws]
-        # gs = np.asarray(gs)[:,-1]
+        gs = [np.asarray(pd.Series(k).rolling(window = int(self.l_window * self.freq) ).mean()) for k in ws]
+        gs = np.asarray(gs)[:,-1]
         # With adyacent windows
-        gs = np.asarray(ws)[:,1:].reshape(self.n_obs, -1,
-            int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
-        return np.round(gs, 12)
+        # gs = np.asarray(ws)[:,1:].reshape(self.n_obs, -1,
+            # int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
+        return gs
 
 def lorenz(w, t0, sigma = 10., r = 28., b = 8./3):
 	"""
