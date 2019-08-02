@@ -38,6 +38,7 @@ class eki(object):
 	    Outputs:
 	    - None
 	    """
+		pass
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
 		"""
