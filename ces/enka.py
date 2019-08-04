@@ -357,7 +357,7 @@ class flow(eki):
 	    Outputs:
 	    - None
 	    """
-		self.W0 = np.tile(wt, self.J).reshape(self.J, 3).T
+		self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
 		# Storing the ensemble members
 		self.Uall = []; self.Uall.append(U0)
@@ -400,7 +400,7 @@ class flow(eki):
 		    #Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D) - np.sqrt(2*hk) * np.matmul(U0 - Umean, S))
 		    Ustar = np.linalg.solve(np.eye(self.p) + hk/(self.sigma**2) * Ucov,
 		    	U0 - hk * np.matmul(U0 - Umean, D) + hk/(self.sigma**2) * np.matmul(Ucov, self.mu))
-		    Uk = np.abs(Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+		    Uk = (Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 		    	np.random.normal(0, 1, [self.p, self.J])))
 
 		    self.Uall.append(Uk)

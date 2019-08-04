@@ -100,7 +100,7 @@ class lorenz96(object):
         - solve: here we define the method we need to solve the model.
         - statistics: here we define the relevant statistics to be computed.
     """
-    def __init__(self, l_window = 10, freq = 100):
+    def __init__(self, l_window = 10, freq = 100, spinup = 10):
         """
         Lorenz 96 model initilization
         """
@@ -109,16 +109,18 @@ class lorenz96(object):
         self.n_state  = self.n_slow * (self.n_fast + 1)
         self.l_window = l_window
         self.freq     = freq
+        self.spinup   = spinup
         self.solve_init = False
 
 
-    def __call__(self, t, w,  h = 1., F = 10., c = 10., b = 10.):
+    def __call__(self, t, w,  h = 1., F = 10., log_c = np.log(10.), b = 10.):
         """
         Reduced Lorenz 96 model with 2 parameters.
         (WARNING): This should be edited somehow to be able to reduce the model
-                in an arbitrary way.
+                in an arbitrary way. I am thinking of some way of choosing the parameters
+                with a boolean vecor.
         """
-        ws = self.model(w, t)
+        ws = self.model(w, t, h, F, log_c, b)
         return ws
 
     def generate_initial(self):
@@ -134,10 +136,12 @@ class lorenz96(object):
 
         return x0
 
-    def model(self, X, t, h = 1., F = 10., c = 10., b = 10.):
+    def model(self, X, t, h = 1., F = 10., log_c = np.log(10.), b = 10.):
         """
         Original Lorenz 96 model with 4 parameters
         """
+        c = np.exp(log_c)
+
         Y = X[self.n_slow:]
         X = X[:self.n_slow]
         dXdt = np.zeros(X.shape)
@@ -172,16 +176,19 @@ class lorenz96(object):
                 t_eval = t, method = self.method, max_step = self.dt)
         else:
             res = np.empty()
-        return res.y
+        return res.y.T
 
-    def statistics(self, data):
-        Phi = np.vstack([data[:self.n_slow].mean(axis = 1),
-            (data[:self.n_slow]**2).mean(axis = 1),
-            data[self.n_slow:].reshape(self.n_slow, self.n_fast, -1).mean(axis = 1).mean(axis = 1),
-            (data[self.n_slow:]**2).reshape(self.n_slow, self.n_fast, -1).mean(axis = 1).mean(axis = 1),
-            (data[:self.n_slow] * (data[self.n_slow:]).reshape(self.n_slow, self.n_fast, -1).mean(axis = 1)).mean(axis = 1)])
+    def statistics(self, ws):
+        ws = ws.T
+        data = np.copy(ws[:,(self.spinup * self.freq + 1):].reshape(self.n_state, -1, self.l_window * self.freq))
 
-        return Phi.reshape(1,-1)
+        Phi = np.vstack([data[:self.n_slow].mean(axis = 2),
+            (data[:self.n_slow]**2).mean(axis = 2),
+            data[self.n_slow:].reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1).mean(axis = 2),
+            (data[self.n_slow:]**2).reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1).mean(axis = 2),
+            (data[:self.n_slow] * (data[self.n_slow:]).reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1)).mean(axis = 2)])
+
+        return Phi[:,-1]
 
 def lorenz96_rhs(X, t, h, F, c, b):
     n_slow = 36       # Slow variables
