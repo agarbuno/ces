@@ -113,9 +113,8 @@ class lorenz96(object):
         self.solve_init = False
 
 
-    def __call__(self, t, w,  h = 1., F = 10., log_c = np.log(10.), b = 10.):
+    def __call__(self, t, w, h = 1., F = 10., log_c = np.log(10.), b = 10.):
         """
-        Reduced Lorenz 96 model with 2 parameters.
         (WARNING): This should be edited somehow to be able to reduce the model
                 in an arbitrary way. I am thinking of some way of choosing the parameters
                 with a boolean vecor.

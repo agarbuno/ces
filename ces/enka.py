@@ -155,8 +155,14 @@ class eki(object):
 		return np.concatenate([gs, ws[-1]])
 
 	def Gpar_pde(self, theta, model, t):
-	    Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in theta.T)
-	    return (np.asarray(Geval).T)
+		if self.parallel:
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in theta.T)
+			return (np.asarray(Geval).T)
+		else:
+			Gs = np.zeros((self.n_obs + model.n_state, theta.shape[1]))
+			for ii, k in enumerate(theta.T):
+				Gs[:, ii] = self.G_pde(k, model, t)
+			return Gs
 
 	def scale_ensemble(self, factor = 2.):
 		self.scale_mean = self.Ustar.mean(axis = 1)[:, np.newaxis]
