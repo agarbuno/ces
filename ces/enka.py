@@ -2,6 +2,8 @@ from __future__ import print_function
 import numpy as np
 import pandas as pd
 import gpflow as gp
+import os
+import pickle
 
 from tqdm import tqdm
 from scipy import integrate
@@ -19,6 +21,20 @@ class eki(object):
 		self.num_cores = multiprocessing.cpu_count()
 		self.scaled = False
 		self.parallel = False
+		self.flag_run = False
+
+	def __str__(self):
+		print(r'Number of parameters ................. %s'%(self.p))
+		print(r'Dimension of forward model output .... %s'%(self.n_obs))
+		print(r'Ensemble size ........................ %s'%(self.J))
+		print(r'Evaluate G in parallel ............... %s'%(self.parallel))
+		print(r'Number of iterations to be run ....... %s'%(self.T))
+		if self.flag_run:
+			print(r'EKS has run for ...................... %s'%(len(self.Uall) - 1))
+		else:
+			print(r'EKS has run for ...................... 0')
+
+		return str()
 
 	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
 		"""
@@ -197,6 +213,22 @@ class eki(object):
 		#print('Prediction done...\n')
 		return [gpmeans, gpvars]
 
+	def save(self, path = './', file = 'ces/', all = False, reset = True):
+		try:
+		    os.makedirs(path+file)
+		except OSError:
+			print('Prior directory already created.')
+
+		if self.flag_run:
+			np.save(path+file+'ensemble', self.Ustar)
+			np.save(path+file+'Gensemble', self.Gstar)
+			pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
+			if all:
+				np.save(path+file+'ensemble_path', self.Uall)
+				np.save(path+file+'Gensemble_path', self.Gall)
+		else:
+			print('There is nothing to save')
+
 # ------------------------------------------------------------------------------
 
 class flow(eki):
@@ -363,10 +395,12 @@ class flow(eki):
 	    Outputs:
 	    - None
 	    """
+		self.flag_run = True
 		self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
 		# Storing the ensemble members
 		self.Uall = []; self.Uall.append(U0)
+		self.Gall = [];
 		self.radspec = []
 
 		# Storing metrics
@@ -379,6 +413,7 @@ class flow(eki):
 
 		for i in tqdm(range(self.T)):
 		    Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
+		    self.Gall.append(Geval)
 		    self.W0 = Geval[self.n_obs:,:]
 		    Geval = Geval[:self.n_obs,:]
 
@@ -404,8 +439,8 @@ class flow(eki):
 
 		    #Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D + S))
 		    #Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D) - np.sqrt(2*hk) * np.matmul(U0 - Umean, S))
-		    Ustar = np.linalg.solve(np.eye(enki.p) + hk * np.linalg.solve(enki.sigma, Ucov),
-		        U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(enki.sigma, np.matmul(Ucov, enki.mu)))
+		    Ustar = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
+		        U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
 		    Uk = (Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 		    	np.random.normal(0, 1, [self.p, self.J])))
 
@@ -418,6 +453,7 @@ class flow(eki):
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
 		Geval = self.Gpar_pde(np.vstack([self.Ustar, self.W0]), model, t)
+		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
 		self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval[:self.n_obs,:]
 
