@@ -24,6 +24,7 @@ Coming shortly:
 - MCMC using GPs.
 
 Dependencies:
+- tqdm
 - numpy
 - gpflow
 - scipy

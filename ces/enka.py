@@ -213,19 +213,29 @@ class eki(object):
 		#print('Prediction done...\n')
 		return [gpmeans, gpvars]
 
-	def save(self, path = './', file = 'ces/', all = False, reset = True):
+	def save(self, path = './', file = 'ces/', all = False, reset = True, last = False):
+		"""
+		All files are stored in pickle format
+		Modes:
+			- Save only last stage (ensemble and model evaluations), and metrics
+			- Save last stage, metrics, and ensemble path.
+		"""
 		try:
 		    os.makedirs(path+file)
 		except OSError:
 			print('Prior directory already created.')
 
 		if self.flag_run:
-			np.save(path+file+'ensemble', self.Ustar)
-			np.save(path+file+'Gensemble', self.Gstar)
-			pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
-			if all:
-				np.save(path+file+'ensemble_path', self.Uall)
-				np.save(path+file+'Gensemble_path', self.Gall)
+			if not last:
+				np.save(path+file+'ensemble', self.Ustar)
+				np.save(path+file+'Gensemble', self.Gstar)
+				pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
+				if all:
+					np.save(path+file+'ensemble_path', self.Uall)
+					np.save(path+file+'Gensemble_path', self.Gall)
+			else:
+				np.save(path+file+'ensemble_'+str(i).zfill(4), self.Uall[-1])
+				np.save(path+file+'Gensemble_'+str(i).zfill(4), self.Uall[-1])
 		else:
 			print('There is nothing to save')
 
