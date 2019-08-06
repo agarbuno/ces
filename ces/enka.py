@@ -22,6 +22,7 @@ class eki(object):
 		self.scaled = False
 		self.parallel = False
 		self.flag_run = False
+		self.save_online = False
 
 	def __str__(self):
 		print(r'Number of parameters ................. %s'%(self.p))
@@ -213,7 +214,7 @@ class eki(object):
 		#print('Prediction done...\n')
 		return [gpmeans, gpvars]
 
-	def save(self, path = './', file = 'ces/', all = False, reset = True, last = False):
+	def save(self, path = './', file = 'ces/', all = False, reset = True, online = False):
 		"""
 		All files are stored in pickle format
 		Modes:
@@ -226,7 +227,7 @@ class eki(object):
 			print('Prior directory already created.')
 
 		if self.flag_run:
-			if not last:
+			if not online:
 				np.save(path+file+'ensemble', self.Ustar)
 				np.save(path+file+'Gensemble', self.Gstar)
 				pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
@@ -456,6 +457,9 @@ class flow(eki):
 
 		    self.Uall.append(Uk)
 		    U0 = Uk
+
+			if self.save_online: 
+				self.save(path = directory+'ensembles/', file = 'l96_100ens/', online = True)
 
 		    if self.t[-1] > 2:
 		    	break
