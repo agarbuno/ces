@@ -112,6 +112,17 @@ class lorenz96(object):
         self.spinup   = spinup
         self.solve_init = False
 
+    def __str__(self):
+        """
+        Printing method
+        """
+        print('Model: ..................... Lorenz 96')
+        print('Number of slow variables ... %s'%(self.n_slow))
+        print('Number of fast variables ... %s'%(self.n_fast))
+        print('Number of parameters........ %s'%(4))
+        print('Solver initialized ......... %s'%(self.solve_init))
+        return str()
+
 
     def __call__(self, t, w, h = 1., F = 10., log_c = np.log(10.), b = 10.):
         """
