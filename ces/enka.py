@@ -404,8 +404,8 @@ class flow(eki):
 
 		    #Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D + S))
 		    #Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D) - np.sqrt(2*hk) * np.matmul(U0 - Umean, S))
-		    Ustar = np.linalg.solve(np.eye(self.p) + hk/(self.sigma**2) * Ucov,
-		    	U0 - hk * np.matmul(U0 - Umean, D) + hk/(self.sigma**2) * np.matmul(Ucov, self.mu))
+		    Ustar = np.linalg.solve(np.eye(enki.p) + hk * np.linalg.solve(enki.sigma, Ucov),
+		        U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(enki.sigma, np.matmul(Ucov, enki.mu)))
 		    Uk = (Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 		    	np.random.normal(0, 1, [self.p, self.J])))
 
