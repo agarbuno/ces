@@ -458,8 +458,8 @@ class flow(eki):
 		    self.Uall.append(Uk)
 		    U0 = Uk
 
-			if self.save_online: 
-				self.save(path = directory+'ensembles/', file = 'l96_100ens/', online = True)
+		    if self.save_online:
+		    	self.save(path=directory+'ensembles/', file = 'l96_100ens/', online = True)
 
 		    if self.t[-1] > 2:
 		    	break
