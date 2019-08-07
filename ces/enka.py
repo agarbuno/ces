@@ -21,7 +21,6 @@ class eki(object):
 		self.num_cores = multiprocessing.cpu_count()
 		self.scaled = False
 		self.parallel = False
-		self.save_online = False
 
 	def __str__(self):
 		print(r'Number of parameters ................. %s'%(self.p))
