@@ -170,7 +170,6 @@ class eki(object):
 		Outputs:
 			- gs: [n_obs + n_state,] array.
 		"""
-		# r, b = k[:self.p]
 		w0 = k[self.p:]
 
 		ws = model.solve(w0, t, args = tuple(k[:self.p]))
@@ -225,8 +224,9 @@ class eki(object):
 		"""
 		All files are stored in pickle format
 		Modes:
-			- Save only last stage (ensemble and model evaluations), and metrics
-			- Save last stage, metrics, and ensemble path.
+			- Last:    save only last stage (ensemble and model evaluations), and metrics
+			- All:     save last stage, metrics, and ensemble path.
+			- Online:  save metrics, ensemble and model evaluations as the algorithm progresses
 		"""
 		try:
 			os.makedirs(path+file)
@@ -244,6 +244,7 @@ class eki(object):
 			else:
 				np.save(path+file+'ensemble_'+str(counter).zfill(4), self.Uall[-1])
 				np.save(path+file+'Gensemble_'+str(counter).zfill(4), self.Uall[-1])
+				pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
 		except AttributeError:
 			print('There is nothing to save')
 
