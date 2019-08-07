@@ -233,6 +233,7 @@ class eki(object):
 			pass
 
 		try:
+			getattr(self, 'Uall')
 			if not online:
 				np.save(path+file+'ensemble', self.Ustar)
 				np.save(path+file+'Gensemble', self.Gstar)
@@ -432,7 +433,7 @@ class flow(eki):
 		self.metrics['V'] = []			# Tracks collapse after forward model evaln
 		self.metrics['R'] = []			# Tracks data-fitting
 		self.metrics['r'] = [] 			# Tracks the collapse towards the truth
-		self.t = []
+		self.metrics['t'] = []
 
 		for i in tqdm(range(self.T)):
 			Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
@@ -454,9 +455,9 @@ class flow(eki):
 			self.radspec.append(np.linalg.eigvals(D).real.max())
 			hk = 1./self.radspec[-1]
 			if i == 0:
-				self.t.append(hk)
+				self.metrics['t'].append(hk)
 			else:
-				self.t.append(hk + self.t[-1])
+				self.metrics['t'].append(hk + self.metrics['t'][-1])
 			Umean = U0.mean(axis = 1)[:, np.newaxis]
 			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
@@ -470,10 +471,12 @@ class flow(eki):
 
 			if save_online:
 				self.save(path = self.directory+'/ensembles/',
-						  file = model.model_name + '_' + str(self.J).zfill(4)+'/',
+						  file = model.model_name + '_' + \
+						  			str(model.l_window).zfill(3)+ '_' + \
+									str(self.J).zfill(4)+'/',
 						  online = True, counter = i)
 
-			if self.t[-1] > 2:
+			if self.metrics['t'][-1] > 2:
 				break
 
 		self.Uall = np.asarray(self.Uall)
