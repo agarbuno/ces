@@ -202,23 +202,6 @@ class lorenz96(object):
 
 		return Phi[:,-1]
 
-def lorenz96_rhs(X, t, h, F, c, b):
-	n_slow = 36       # Slow variables
-	n_fast = 10       # Fast variables
-
-	Y = X[n_slow:]
-	X = X[:n_slow]
-	dXdt = np.zeros(X.shape)
-	dYdt = np.zeros(Y.shape)
-	for k in range(n_slow):
-		dXdt[k] = -X[k - 1] * (X[k - 2] - X[(k + 1) % n_slow]) - X[k] + F - \
-					(h * c) * np.mean(Y[k * n_fast: (k + 1) * n_fast])
-	for j in range(n_fast * n_slow):
-		dYdt[j] = -c * b * Y[(j + 1) % (n_fast * n_slow)] * (Y[(j + 2) % (n_fast * n_slow)] - \
-					Y[j-1]) - c * Y[j] + ((h*c)/n_fast) * X[int(j / n_fast)]
-
-	return np.hstack((dXdt, dYdt))
-
 def lorenz96_dim(t, X, h = 1., F = 10., c = 2**7., b = 1.):
 	n_slow = 36       # Slow variables
 	n_fast = 10       # Fast variables
