@@ -30,16 +30,15 @@ class eki(object):
 		print(r'Number of iterations to be run ....... %s'%(self.T))
 
 		try:
-			print('Path to save: ......................... %s'%('~/.../'+'/'.join(self.directory.split('/')[-2:])))
+			getattr(self, 'directory')
 		except AttributeError:
 			self.directory = os.getcwd()
-			print('Path to save: ......................... %s'%('~/.../'+'/'.join(self.directory.split('/')[-2:])))
+		print('Path to save: ......................... %s'%('~/.../'+'/'.join(self.directory.split('/')[-2:])))
 
 		try:
 			print(r'Number of iterations EKS has run ..... %s'%(len(self.Uall) - 1))
 		except AttributeError:
 			print(r'NOTE: EKS has not been run!')
-
 
 		return str()
 
@@ -415,6 +414,11 @@ class flow(eki):
 		Outputs:
 		- None
 		"""
+		try:
+			getattr(self, 'directory')
+		except AttributeError:
+			self.directory = os.getcwd()
+
 		self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
 		# Storing the ensemble members
@@ -465,11 +469,6 @@ class flow(eki):
 			U0 = Uk
 
 			if save_online:
-				try:
-					self.directory
-				except AttributeError:
-					self.directory = os.getcwd()
-
 				self.save(path = self.directory+'/ensembles/',
 						  file = model.model_name + '_' + str(self.J).zfill(4)+'/',
 						  online = True, counter = i)
