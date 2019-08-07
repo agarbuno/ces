@@ -473,6 +473,7 @@ class flow(eki):
 				self.save(path = self.directory+'/ensembles/',
 						  file = model.model_name + '_' + str(self.J).zfill(4)+'/',
 						  online = True, counter = i)
+
 			if self.t[-1] > 2:
 				break
 
