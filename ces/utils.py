@@ -44,6 +44,7 @@ class lorenz63(object):
 		self.n_obs = 9
 		self.l_window = l_window
 		self.freq = freq
+		self.model_name = 'lorenz63'
 
 	def __call__(self, w, t, r = 28., b = 8./3):
 		"""
@@ -111,6 +112,7 @@ class lorenz96(object):
 		self.freq     = freq
 		self.spinup   = spinup
 		self.solve_init = False
+		self.model_name = 'lorenz96'
 
 	def __str__(self):
 		"""

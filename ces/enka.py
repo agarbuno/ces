@@ -21,7 +21,6 @@ class eki(object):
 		self.num_cores = multiprocessing.cpu_count()
 		self.scaled = False
 		self.parallel = False
-		self.flag_run = False
 		self.save_online = False
 
 	def __str__(self):
@@ -30,10 +29,18 @@ class eki(object):
 		print(r'Ensemble size ........................ %s'%(self.J))
 		print(r'Evaluate G in parallel ............... %s'%(self.parallel))
 		print(r'Number of iterations to be run ....... %s'%(self.T))
-		if self.flag_run:
-			print(r'EKS has run for ...................... %s'%(len(self.Uall) - 1))
-		else:
-			print(r'EKS has run for ...................... 0')
+
+		try:
+			print('Path to save: ......................... %s'%('~/.../'+'/'.join(self.directory.split('/')[-2:])))
+		except AttributeError:
+			self.directory = os.getcwd()
+			print('Path to save: ......................... %s'%('~/.../'+'/'.join(self.directory.split('/')[-2:])))
+
+		try:
+			print(r'Number of iterations EKS has run ..... %s'%(len(self.Uall) - 1))
+		except AttributeError:
+			print(r'NOTE: EKS has not been run!')
+
 
 		return str()
 
@@ -214,7 +221,8 @@ class eki(object):
 		#print('Prediction done...\n')
 		return [gpmeans, gpvars]
 
-	def save(self, path = './', file = 'ces/', all = False, reset = True, online = False):
+	def save(self, path = './', file = 'ces/', all = False,
+			reset = True, online = False, counter = 0):
 		"""
 		All files are stored in pickle format
 		Modes:
@@ -224,9 +232,9 @@ class eki(object):
 		try:
 			os.makedirs(path+file)
 		except OSError:
-			print('Prior directory already created.')
+			pass
 
-		if self.flag_run:
+		try:
 			if not online:
 				np.save(path+file+'ensemble', self.Ustar)
 				np.save(path+file+'Gensemble', self.Gstar)
@@ -235,9 +243,9 @@ class eki(object):
 					np.save(path+file+'ensemble_path', self.Uall)
 					np.save(path+file+'Gensemble_path', self.Gall)
 			else:
-				np.save(path+file+'ensemble_'+str(i).zfill(4), self.Uall[-1])
-				np.save(path+file+'Gensemble_'+str(i).zfill(4), self.Uall[-1])
-		else:
+				np.save(path+file+'ensemble_'+str(counter).zfill(4), self.Uall[-1])
+				np.save(path+file+'Gensemble_'+str(counter).zfill(4), self.Uall[-1])
+		except AttributeError:
 			print('There is nothing to save')
 
 # ------------------------------------------------------------------------------
@@ -388,7 +396,8 @@ class flow(eki):
 
 		self.Uall = np.asarray(self.Uall)
 
-	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise, verbose = True):
+	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise,
+				save_online = False, verbose = True):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF.
@@ -406,7 +415,6 @@ class flow(eki):
 		Outputs:
 		- None
 		"""
-		self.flag_run = True
 		self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
 		# Storing the ensemble members
@@ -448,8 +456,6 @@ class flow(eki):
 			Umean = U0.mean(axis = 1)[:, np.newaxis]
 			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
-			#Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D + S))
-			#Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D) - np.sqrt(2*hk) * np.matmul(U0 - Umean, S))
 			Ustar = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
 				U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
 			Uk = (Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
@@ -458,9 +464,15 @@ class flow(eki):
 			self.Uall.append(Uk)
 			U0 = Uk
 
-			if self.save_online:
-				self.save(path=directory+'ensembles/', file = 'l96_100ens/', online = True)
+			if save_online:
+				try:
+					self.directory
+				except AttributeError:
+					self.directory = os.getcwd()
 
+				self.save(path = self.directory+'/ensembles/',
+						  file = model.model_name + '_' + str(self.J).zfill(4)+'/',
+						  online = True, counter = i)
 			if self.t[-1] > 2:
 				break
 
@@ -470,6 +482,7 @@ class flow(eki):
 		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
 		self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval[:self.n_obs,:]
+		self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+'/'
 
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
 		"""
@@ -665,7 +678,7 @@ class iterative(eki):
 			# 	np.matmul(Jnoise, (np.random.normal(0, 1, [self.n_obs, self.J]))) - Geval))
 			# Uk = U0 + dU
 
-			# For tracking metrics
+			# tracking metrics
 			R = Geval - y_obs[:,np.newaxis]
 			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
 			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
