@@ -243,10 +243,45 @@ class eki(object):
 					np.save(path+file+'Gensemble_path', self.Gall)
 			else:
 				np.save(path+file+'ensemble_'+str(counter).zfill(4), self.Uall[-1])
-				np.save(path+file+'Gensemble_'+str(counter).zfill(4), self.Uall[-1])
+				np.save(path+file+'Gensemble_'+str(counter).zfill(4), self.Gall[-1])
 				pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
 		except AttributeError:
 			print('There is nothing to save')
+
+	def load(self, path = './', eks_dir = 'ces/', ix_ensemble = False):
+		"""
+		Load files and rebuild an eka object.
+		"""
+		files = os.listdir(path + eks_dir)
+		try:
+			self.metrics = pickle.load(open(path + eks_dir + 'metrics.pkl', 'rb'))
+		except FileNotFoundError:
+			print('Metrics object not found. Could not load EKS object.')
+			return False
+
+		if not ix_ensemble:
+			try:
+				self.Uall = np.load(path + eks_dir + 'ensemble_path.npy')
+				self.Gall = np.load(path + eks_dir + 'Gensemble_path.npy')
+			except FileNotFoundError:
+				print('Path files not found.')
+				return False
+		else:
+			try:
+				self.Uall = []
+				self.Gall = []
+				for iter in range(len(self.metrics['v'])):
+					self.Uall.append(np.load(path + eks_dir + 'ensemble_' + str(iter).zfill(4) + '.npy'))
+					self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
+				self.Uall = np.asarray(self.Uall)
+				self.Gall = np.asarray(self.Gall)
+				self.Ustar = self.Uall[-1]
+				self.Gstar = self.Gall[-1]
+				self.J = self.Uall.shape[-1]
+			except FileNotFoundError:
+				return False
+
+		return True
 
 # ------------------------------------------------------------------------------
 
