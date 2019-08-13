@@ -457,18 +457,21 @@ class flow(eki):
 
 		self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
-		# Storing the ensemble members
-		self.Uall = []; self.Uall.append(U0)
-		self.Gall = [];
-		self.radspec = []
+		try:
+			getattr(self, 'Uall')
+		except AttributeError:
+			# Storing the ensemble members
+			self.Uall = []; self.Uall.append(U0)
+			self.Gall = [];
+			self.radspec = []
 
-		# Storing metrics
-		self.metrics = dict()
-		self.metrics['v'] = [] 			# Tracks collapse in parameter space
-		self.metrics['V'] = []			# Tracks collapse after forward model evaln
-		self.metrics['R'] = []			# Tracks data-fitting
-		self.metrics['r'] = [] 			# Tracks the collapse towards the truth
-		self.metrics['t'] = []
+			# Storing metrics
+			self.metrics = dict()
+			self.metrics['v'] = []			# Tracks collapse in parameter space
+			self.metrics['V'] = []			# Tracks collapse after forward model evaln
+			self.metrics['R'] = []			# Tracks data-fitting
+			self.metrics['r'] = []			# Tracks the collapse towards the truth
+			self.metrics['t'] = []
 
 		for i in tqdm(range(self.T)):
 			Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
@@ -549,7 +552,7 @@ class flow(eki):
 
 		# Storing metrics
 		self.metrics = dict()
-		self.metrics['v'] = [] 			# Tracks collapse in parameter space
+		self.metrics['v'] = []			# Tracks collapse in parameter space
 		self.metrics['V'] = []			# Tracks collapse after forward model evaln
 		self.metrics['R'] = []			# Tracks data-fitting
 		self.metrics['r'] = []
