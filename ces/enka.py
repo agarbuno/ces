@@ -508,12 +508,20 @@ class flow(eki):
 			U0 = Uk
 
 			if save_online:
-				self.save(path = self.directory+'/ensembles/',
-						  file = model.model_name + '_' + \
-						  			str(model.l_window).zfill(3)+ '_' + \
-									str(self.J).zfill(4)+ '_' + \
-									str(self.nexp).zfill(2) + '/',
-						  online = True, counter = i)
+				try:
+					getattr(self, 'nexp')
+					self.save(path = self.directory+'/ensembles/',
+							  file = model.model_name + '_' + \
+							  			str(model.l_window).zfill(3)+ '_' + \
+										str(self.J).zfill(4)+ '_' + \
+										str(self.nexp).zfill(2) + '/',
+							  online = True, counter = i)
+				except AttributeError:
+					self.save(path = self.directory+'/ensembles/',
+							  file = model.model_name + '_' + \
+							  			str(model.l_window).zfill(3)+ '_' + \
+										str(self.J).zfill(4) + '/',
+							  online = True, counter = i)
 
 			if self.metrics['t'][-1] > 2:
 				break
@@ -524,7 +532,11 @@ class flow(eki):
 		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
 		self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval[:self.n_obs,:]
-		self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
+		try:
+			getattr(self, 'nexp')
+			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
+		except AttributeError:
+			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '/'
 
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
 		"""
