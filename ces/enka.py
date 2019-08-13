@@ -508,7 +508,8 @@ class flow(eki):
 				self.save(path = self.directory+'/ensembles/',
 						  file = model.model_name + '_' + \
 						  			str(model.l_window).zfill(3)+ '_' + \
-									str(self.J).zfill(4)+'/',
+									str(self.J).zfill(4)+ '_' + \
+									str(self.nexp).zfill(2) + '/',
 						  online = True, counter = i)
 
 			if self.metrics['t'][-1] > 2:
@@ -520,7 +521,7 @@ class flow(eki):
 		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
 		self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval[:self.n_obs,:]
-		self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+'/'
+		self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
 
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
 		"""
