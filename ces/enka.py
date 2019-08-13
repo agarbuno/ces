@@ -246,7 +246,7 @@ class eki(object):
 				np.save(path+file+'Gensemble_'+str(counter).zfill(4), self.Gall[-1])
 				pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
 		except AttributeError:
-			print('There is nothing to save')
+			tqdm.write('There is nothing to save')
 
 	def load(self, path = './', eks_dir = 'ces/', ix_ensemble = False):
 		"""
