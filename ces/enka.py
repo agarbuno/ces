@@ -13,14 +13,15 @@ import multiprocessing
 class eki(object):
 
 	def __init__(self, p, n_obs, J):
-		self.n_obs = n_obs		  # Dimensionality of statistics (observations)
-		self.p = p                # Dimensionality of theta (parameters)
-		self.J = J                # Number of ensemble particles
-		self.epsilon = 1e-7       # Underflow protection
-		self.T = 30               # Number of maximum iterations
+		self.n_obs     = n_obs        # Dimensionality of statistics (observations)
+		self.p         = p            # Dimensionality of theta (parameters)
+		self.J         = J            # Number of ensemble particles
+		self.epsilon   = 1e-7         # Underflow protection
+		self.T         = 30           # Number of maximum iterations
 		self.num_cores = multiprocessing.cpu_count()
-		self.scaled = False
-		self.parallel = False
+		self.scaled    = False
+		self.parallel  = False
+		self.mute_bar  = True
 
 	def __repr__(self):
 		return 'eki' + ',' + self.J
@@ -180,7 +181,7 @@ class eki(object):
 
 	def Gpar_pde(self, theta, model, t):
 		if self.parallel:
-			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in theta.T)
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T, disable = self.mute_bar))
 			return (np.asarray(Geval).T)
 		else:
 			Gs = np.zeros((self.n_obs + model.n_state, theta.shape[1]))
