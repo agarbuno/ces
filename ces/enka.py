@@ -460,11 +460,14 @@ class flow(eki):
 		except AttributeError:
 			self.directory = os.getcwd()
 
-		self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
-
 		try:
 			getattr(self, 'Uall')
+			self.Uall = list(self.Uall)
+			self.Gall = list(self.Gall)
+
 		except AttributeError:
+			self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
+
 			# Storing the ensemble members
 			self.Uall = []; self.Uall.append(U0)
 			self.Gall = [];
