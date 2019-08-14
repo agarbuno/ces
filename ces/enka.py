@@ -22,6 +22,9 @@ class eki(object):
 		self.scaled = False
 		self.parallel = False
 
+	def __repr__(self):
+		return 'eki' + ',' + self.J
+
 	def __str__(self):
 		print(r'Number of parameters ................. %s'%(self.p))
 		print(r'Dimension of forward model output .... %s'%(self.n_obs))

@@ -44,6 +44,7 @@ class lorenz63(object):
 		self.n_obs = 9
 		self.l_window = l_window
 		self.freq = freq
+		self.solve_init = False
 		self.model_name = 'lorenz63'
 
 	def __call__(self, w, t, r = 28., b = 8./3):
@@ -101,18 +102,21 @@ class lorenz96(object):
 		- solve: here we define the method we need to solve the model.
 		- statistics: here we define the relevant statistics to be computed.
 	"""
-	def __init__(self, l_window = 10, freq = 100, spinup = 10):
+	def __init__(self, n_slow = 36, n_fast = 10, l_window = 10, freq = 100, spinup = 10):
 		"""
 		Lorenz 96 model initilization
 		"""
-		self.n_slow   = 36
-		self.n_fast   = 10
+		self.n_slow   = n_slow
+		self.n_fast   = n_fast
 		self.n_state  = self.n_slow * (self.n_fast + 1)
 		self.l_window = l_window
 		self.freq     = freq
 		self.spinup   = spinup
 		self.solve_init = False
 		self.model_name = 'lorenz96'
+
+	def __repr__(self):
+		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast)
 
 	def __str__(self):
 		"""
@@ -201,6 +205,25 @@ class lorenz96(object):
 			(data[:self.n_slow] * (data[self.n_slow:]).reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1)).mean(axis = 2)])
 
 		return Phi[:,-1]
+
+class lorenz96Fc(lorenz96):
+	def __repr__(self):
+		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(2)
+
+	def __str__(self):
+		"""
+		Printing method
+		"""
+		print('Model: ..................... Lorenz 96')
+		print('Number of slow variables ... %s'%(self.n_slow))
+		print('Number of fast variables ... %s'%(self.n_fast))
+		print('Number of parameters........ %s'%(2))
+		print('Solver initialized ......... %s'%(self.solve_init))
+		return str()
+
+	def __call__(self, t, w, F = 10., log_c = np.log(10.)):
+		ws = self.model(w, t, 1., F, log_c, 10.)
+		return ws
 
 def lorenz96_dim(t, X, h = 1., F = 10., c = 2**7., b = 1.):
 	n_slow = 36       # Slow variables
