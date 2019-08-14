@@ -5,7 +5,8 @@ import numpy as np
 import pandas as pd
 # import gpflow as gp
 
-from tqdm import tqdm
+# from tqdm import tqdm
+from tqdm.autonotebook import tqdm
 from scipy import integrate
 from joblib import Parallel, delayed
 import multiprocessing
@@ -181,7 +182,7 @@ class eki(object):
 
 	def Gpar_pde(self, theta, model, t):
 		if self.parallel:
-			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T, disable = self.mute_bar))
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T, desc = 'Model evaluations: ', disable = self.mute_bar, position = 1))
 			return (np.asarray(Geval).T)
 		else:
 			Gs = np.zeros((self.n_obs + model.n_state, theta.shape[1]))
@@ -477,7 +478,7 @@ class flow(eki):
 			self.metrics['r'] = []			# Tracks the collapse towards the truth
 			self.metrics['t'] = []
 
-		for i in tqdm(range(self.T)):
+		for i in tqdm(range(self.T), desc = 'EKS iterations: '):
 			Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
 			self.Gall.append(Geval)
 			self.W0 = Geval[self.n_obs:,:]
