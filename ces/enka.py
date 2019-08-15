@@ -182,7 +182,7 @@ class eki(object):
 
 	def Gpar_pde(self, theta, model, t):
 		if self.parallel:
-			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T, desc = 'Model evaluations: ', disable = self.mute_bar, position = 1))
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T, desc = 'Model evaluations: ', disable = self.mute_bar))
 			return (np.asarray(Geval).T)
 		else:
 			Gs = np.zeros((self.n_obs + model.n_state, theta.shape[1]))
