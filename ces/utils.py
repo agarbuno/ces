@@ -225,6 +225,44 @@ class lorenz96Fc(lorenz96):
 		ws = self.model(w, t, 1., F, log_c, 10.)
 		return ws
 
+class lorenz96hFb(lorenz96):
+	def __repr__(self):
+		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(3)
+
+	def __str__(self):
+		"""
+		Printing method
+		"""
+		print('Model: ..................... Lorenz 96')
+		print('Number of slow variables ... %s'%(self.n_slow))
+		print('Number of fast variables ... %s'%(self.n_fast))
+		print('Number of parameters........ %s'%(3))
+		print('Solver initialized ......... %s'%(self.solve_init))
+		return str()
+
+	def __call__(self, t, w, h = 1., F = 10., b = 10.):
+		ws = self.model(w, t, h, F, np.log(10), b)
+		return ws
+
+class lorenz96hcb(lorenz96):
+	def __repr__(self):
+		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(3)
+
+	def __str__(self):
+		"""
+		Printing method
+		"""
+		print('Model: ..................... Lorenz 96')
+		print('Number of slow variables ... %s'%(self.n_slow))
+		print('Number of fast variables ... %s'%(self.n_fast))
+		print('Number of parameters........ %s'%(3))
+		print('Solver initialized ......... %s'%(self.solve_init))
+		return str()
+
+	def __call__(self, t, w, h = 1., log_c = np.log(10.), b = 10.):
+		ws = self.model(w, t, h, 10., log_c, b)
+		return ws
+
 def lorenz96_dim(t, X, h = 1., F = 10., c = 2**7., b = 1.):
 	n_slow = 36       # Slow variables
 	n_fast = 10       # Fast variables
