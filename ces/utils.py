@@ -47,6 +47,12 @@ class lorenz63(object):
 		self.solve_init = False
 		self.model_name = 'lorenz63'
 
+	def __repr__(self):
+		return self.model_name
+
+	def __str__(self):
+		return self.model_name
+
 	def __call__(self, w, t, r = 28., b = 8./3):
 		"""
 		Reduced Lorenz 63 model with 2 parameters.
