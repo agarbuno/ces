@@ -51,7 +51,7 @@ class lorenz63(object):
 		return self.model_name
 
 	def __str__(self):
-		return self.model_name
+		return self.model_name + str(self.n_state)
 
 	def __call__(self, w, t, r = 28., b = 8./3):
 		"""
