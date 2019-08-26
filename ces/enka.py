@@ -25,7 +25,7 @@ class eki(object):
 		self.mute_bar  = True
 
 	def __repr__(self):
-		return 'eki' + ',' + self.J
+		return 'eki' + '-' + str(self.J).zfill(4)
 
 	def __str__(self):
 		print(r'Number of parameters ................. %s'%(self.p))
