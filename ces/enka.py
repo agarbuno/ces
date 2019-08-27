@@ -182,7 +182,11 @@ class eki(object):
 
 	def Gpar_pde(self, theta, model, t):
 		if self.parallel:
-			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T, desc = 'Model evaluations: ', disable = self.mute_bar))
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T,
+					desc = 'Model evaluations: ',
+					disable = self.mute_bar,
+					leave = False,
+					position = 1))
 			return (np.asarray(Geval).T)
 		else:
 			Gs = np.zeros((self.n_obs + model.n_state, theta.shape[1]))
@@ -223,8 +227,7 @@ class eki(object):
 		#print('Prediction done...\n')
 		return [gpmeans, gpvars]
 
-	def save(self, path = './', file = 'ces/', all = False,
-			reset = True, online = False, counter = 0):
+	def save(self, path = './', file = 'ces/', all = False, reset = True, online = False, counter = 0):
 		"""
 		All files are stored in pickle format
 		Modes:
@@ -481,7 +484,7 @@ class flow(eki):
 			self.metrics['r'] = []			# Tracks the collapse towards the truth
 			self.metrics['t'] = []
 
-		for i in tqdm(range(self.T), desc = 'EKS iterations: '):
+		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 0):
 			Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
 			self.Gall.append(Geval)
 			self.W0 = Geval[self.n_obs:,:]
@@ -509,7 +512,7 @@ class flow(eki):
 
 			Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
 				U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
-			Uk = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+			Uk = np.abs(Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 				np.random.normal(0, 1, [self.p, self.J])))
 
 			self.Uall.append(Uk)
