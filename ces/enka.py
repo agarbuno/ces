@@ -507,9 +507,9 @@ class flow(eki):
 			Umean = U0.mean(axis = 1)[:, np.newaxis]
 			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
-			Ustar = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
+			Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
 				U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
-			Uk = (Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+			Uk = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 				np.random.normal(0, 1, [self.p, self.J])))
 
 			self.Uall.append(Uk)
