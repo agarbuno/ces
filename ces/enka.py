@@ -376,20 +376,18 @@ class flow(eki):
 			if self.metrics['t'][-1] > 2:
 				break
 
+		if model.type == 'pde':
+			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+			self.W0 = Geval[self.n_obs:,:]
+		elif model.type == 'map':
+			Geval = self.G_ens(U0, model)
+
 		if trace:
 			self.Uall = np.asarray(self.Uall)
 			self.Ustar = self.Uall[-1]
+			self.Gall.append(Geval); self.Gall = np.array(self.Gall)
 		else:
 			self.Ustar = U0
-
-		if model.type == 'pde':
-			Geval = self.G_pde_ens(np.vstack([self.Ustar, self.W0]), model, t)
-			self.W0 = Geval[self.n_obs:,:]
-		elif model.type == 'map':
-			Geval = self.G_ens(self.Ustar, model)
-
-		if trace:
-			self.Gall.append(Geval); self.Gall = np.array(self.Gall)
 
 		self.Gstar = Geval[:self.n_obs,:]
 
