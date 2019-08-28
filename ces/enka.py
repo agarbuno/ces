@@ -283,16 +283,22 @@ class flow(eki):
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF.
+		of the EKnF. The update can selected from a range of options.
 
 		Inputs:
 		- U0: A numpy array of shape (p, J) initial ensemble; there are J
 			ensemble particles each of dimension p.
 		- y_obs: A numpy array of shape (n_obs,) of observed data.
+		- model: Forward model to be used. Currently for two types of problems.
+			- 'pde' : pde / ode constrained forward models.
+			- 'map' : input output functions.
+		- Gamma: Noise covariance structure. Shape has to be (n_obs, n_obs)
+		- Jnoise: Precomputed cholesky decomposition of Gamma.
+
+		Optional (pde model type only):
 		- wt: A numpy array of initial conditions to start the ensemble when
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
-		- ...
 
 		Outputs:
 		- None
@@ -346,7 +352,7 @@ class flow(eki):
 
 			if trace:
 				self.Gall.append(Geval)
-				
+
 			Geval = Geval[:self.n_obs,:]
 
 			U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
@@ -542,19 +548,22 @@ class flow(eki):
 		self.Uall = np.asarray(self.Uall)
 
 	def eks_update(self, y_obs, U0, Geval, Gamma, iter, trace = True, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		"""
+
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
 		R = Geval - y_obs[:,np.newaxis]
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		if trace:
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
+		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 		self.radspec.append(np.linalg.eigvals(D).real.max())
+
 		hk = 1./self.radspec[-1]
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
@@ -568,10 +577,10 @@ class flow(eki):
 		Uk     = np.abs(Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
-		self.Uall.append(Uk)
-		U0 = Uk
+		if trace:
+			self.Uall.append(Uk)
 
-		return U0
+		return Uk
 
 # ------------------------------------------------------------------------------
 
