@@ -86,26 +86,6 @@ class eki(object):
 		"""
 		pass
 
-	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise):
-		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF. For PDE constrained inversion problems.
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-
-		Outputs:
-		- None
-		"""
-		pass
-
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
@@ -300,10 +280,10 @@ class eki(object):
 
 class flow(eki):
 
-	def run(self, y_obs, U0, model, Gamma, Jnoise):
+	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, **kwargs):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF
+		of the EnKF.
 
 		Inputs:
 		- U0: A numpy array of shape (p, J) initial ensemble; there are J
@@ -314,64 +294,95 @@ class flow(eki):
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
 
-
 		Outputs:
 		- None
 		"""
-		# Storing the ensemble members
-		self.Uall = []; self.Uall.append(U0)
-		self.radspec = []
+		try:
+			getattr(model, 'type')
+		except AttributeError:
+			raise
 
-		# Storing metrics
-		self.metrics = dict()
-		self.metrics['v'] = [] 			# Tracks collapse in parameter space
-		self.metrics['V'] = []			# Tracks collapse after forward model evaln
-		self.metrics['R'] = []			# Tracks data-fitting
-		self.metrics['r'] = [] 			# Tracks the collapse towards the truth
-		self.t = []
+		try:
+			getattr(self, 'directory')
+		except AttributeError:
+			self.directory = os.getcwd()
 
-		for i in tqdm(range(self.T)):
-			Geval = self.G_ens(U0, model)
+		try:
+			getattr(self, 'Uall')
+			self.Uall = list(self.Uall)
+			self.Gall = list(self.Gall)
 
-			# For ensemble update
-			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-			R = Geval - y_obs[:,np.newaxis]
-			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+		except AttributeError:
+			if model.type == 'pde':
+				wt = kwargs.get('wt', None)
+				t  = kwargs.get('t', None)
+				self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
-			# Track metrics
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+			# Storing the ensemble members
+			self.Uall = []; self.Uall.append(U0)
+			self.Gall = [];
+			self.radspec = []
 
-			# Compute the update
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			#hk = 1./(np.linalg.norm(D) + 1e-8)
-			hk = 1./self.radspec[-1]
-			#hk = 0.01
+			# Storing metrics
+			self.metrics = dict()
+			self.metrics['v'] = []			# Tracks collapse in parameter space
+			self.metrics['V'] = []			# Tracks collapse after forward model evaln
+			self.metrics['R'] = []			# Tracks data-fitting
+			self.metrics['r'] = []			# Tracks the collapse towards the truth
+			self.metrics['t'] = []
 
-			if i == 0:
-				self.t.append(hk)
+		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 0):
+			if model.type == 'pde':
+				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+				self.W0 = Geval[self.n_obs:,:]
+			elif model.type == 'map':
+				Geval = self.G_ens(U0, model)
 			else:
-				self.t.append(hk + self.t[-1])
-			Umean = U0.mean(axis = 1)[:, np.newaxis]
-			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+				break
 
-			Ustar = np.linalg.solve(np.eye(self.p) + hk/(self.sigma**2) * Ucov,
-				U0 - hk * np.matmul(U0 - Umean, D) + hk/(self.sigma**2) * np.matmul(Ucov, self.mu))
-			Uk = Ustar + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov), np.random.normal(0, 1, [self.p, self.J]))
+			self.Gall.append(Geval)
+			Geval = Geval[:self.n_obs,:]
 
-			self.Uall.append(Uk)
-			U0 = Uk
+			U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
 
-			if self.t[-1] > 2:
+			if save_online:
+				try:
+					getattr(self, 'nexp')
+					self.save(path = self.directory+'/ensembles/',
+							  file = model.model_name + '_' + \
+							  			str(model.l_window).zfill(3)+ '_' + \
+										str(self.J).zfill(4)+ '_' + \
+										str(self.nexp).zfill(2) + '/',
+							  online = True, counter = i)
+				except AttributeError:
+					self.save(path = self.directory+'/ensembles/',
+							  file = model.model_name + '_' + \
+							  			str(model.l_window).zfill(3)+ '_' + \
+										str(self.J).zfill(4) + '/',
+							  online = True, counter = i)
+
+			if self.metrics['t'][-1] > 2:
 				break
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
-		self.Gstar = self.G_ens(self.Ustar, model)
 
-	def run_sde(self, y_obs, U0, model, Gamma, Jnoise):
+		if model.type == 'pde':
+			Geval = self.G_pde_ens(np.vstack([self.Ustar, self.W0]), model, t)
+			self.W0 = Geval[self.n_obs:,:]
+		elif model.type == 'map':
+			Geval = self.G_ens(self.Ustar, model)
+
+		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
+		self.Gstar = Geval[:self.n_obs,:]
+
+		try:
+			getattr(self, 'nexp')
+			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
+		except AttributeError:
+			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '/'
+
+	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, save_online = False):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF
@@ -443,88 +454,6 @@ class flow(eki):
 			U0 = Uk
 
 		self.Uall = np.asarray(self.Uall)
-
-	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise, save_online = False):
-		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF.
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-		Outputs:
-		- None
-		"""
-		try:
-			getattr(self, 'directory')
-		except AttributeError:
-			self.directory = os.getcwd()
-
-		try:
-			getattr(self, 'Uall')
-			self.Uall = list(self.Uall)
-			self.Gall = list(self.Gall)
-
-		except AttributeError:
-			self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
-
-			# Storing the ensemble members
-			self.Uall = []; self.Uall.append(U0)
-			self.Gall = [];
-			self.radspec = []
-
-			# Storing metrics
-			self.metrics = dict()
-			self.metrics['v'] = []			# Tracks collapse in parameter space
-			self.metrics['V'] = []			# Tracks collapse after forward model evaln
-			self.metrics['R'] = []			# Tracks data-fitting
-			self.metrics['r'] = []			# Tracks the collapse towards the truth
-			self.metrics['t'] = []
-
-		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 0):
-			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
-			self.Gall.append(Geval)
-			self.W0 = Geval[self.n_obs:,:]
-			Geval = Geval[:self.n_obs,:]
-
-			U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
-
-			if save_online:
-				try:
-					getattr(self, 'nexp')
-					self.save(path = self.directory+'/ensembles/',
-							  file = model.model_name + '_' + \
-							  			str(model.l_window).zfill(3)+ '_' + \
-										str(self.J).zfill(4)+ '_' + \
-										str(self.nexp).zfill(2) + '/',
-							  online = True, counter = i)
-				except AttributeError:
-					self.save(path = self.directory+'/ensembles/',
-							  file = model.model_name + '_' + \
-							  			str(model.l_window).zfill(3)+ '_' + \
-										str(self.J).zfill(4) + '/',
-							  online = True, counter = i)
-
-			if self.metrics['t'][-1] > 2:
-				break
-
-		self.Uall = np.asarray(self.Uall)
-		self.Ustar = self.Uall[-1]
-		Geval = self.G_pde_ens(np.vstack([self.Ustar, self.W0]), model, t)
-		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
-		self.W0 = Geval[self.n_obs:,:]
-		self.Gstar = Geval[:self.n_obs,:]
-		try:
-			getattr(self, 'nexp')
-			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
-		except AttributeError:
-			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '/'
 
 	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
 		"""

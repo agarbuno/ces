@@ -46,6 +46,7 @@ class lorenz63(object):
 		self.freq = freq
 		self.solve_init = False
 		self.model_name = 'lorenz63'
+		self.type = 'pde'
 
 	def __repr__(self):
 		return self.model_name
@@ -120,6 +121,7 @@ class lorenz96(object):
 		self.spinup   = spinup
 		self.solve_init = False
 		self.model_name = 'lorenz96'
+		self.type     = 'pde'
 
 	def __repr__(self):
 		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast)
