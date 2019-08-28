@@ -8,7 +8,7 @@ To import the module into a python script or project, type
 
 ```
 import sys
-sys.path.append('Your path/ipuq/ces/')
+sys.path.append('Your path/ipuq/')
 
 from ces.utils import *
 from ces.enka import *
@@ -18,10 +18,11 @@ from ces.enka import *
 Overview of this module:
 - `enka` contains the ensemble Kalman algorithms.
 - `utils` contains the additional tools for running the examples. Like test functions,
-PDEs constrained functions to solve the inverse problem through an approximate Bayesian method.  
+and PDEs constrained functions. The goal is to solve inverse problems through an approximate Bayesian method.  
 
 Coming shortly:
-- MCMC using GPs.
+- MCMC 
+- Accelerated MCMC using GPs.
 
 Dependencies:
 - tqdm
@@ -33,6 +34,7 @@ Dependencies:
 ---
 
 References:
+- Garbuno-Inigo, A., Hoffmann, F., Li, W., & Stuart, A. M. _Interacting Langevin Diffusions: Gradient Structure And Ensemble Kalman Approximation_.
 
-Iglesias et al. Ensemble Kalman methods for inverse problems. Inverse
+- Iglesias et al. _Ensemble Kalman methods for inverse problems._ Inverse
 Problems 29.
