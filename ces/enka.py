@@ -47,7 +47,7 @@ class eki(object):
 
 		return str()
 
-	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
+	def run_sde(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF
@@ -60,14 +60,14 @@ class eki(object):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
 		"""
 		pass
 
-	def run(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
+	def run(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF.
@@ -80,14 +80,13 @@ class eki(object):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
 
 		Outputs:
 		- None
 		"""
 		pass
 
-	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise, verbose = True):
+	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF. For PDE constrained inversion problems.
@@ -100,14 +99,14 @@ class eki(object):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
 		"""
 		pass
 
-	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
+	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF. Data averages are provided as a stream.
@@ -120,10 +119,16 @@ class eki(object):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
+		"""
+		pass
+
+	def eks_update(self, Geval):
+		"""
+		Perform a single step update of the EKS algorithm.
 		"""
 		pass
 
@@ -138,7 +143,7 @@ class eki(object):
 		g = model(theta)
 		return g
 
-	def Gpar(self, theta, model):
+	def G_ens(self, theta, model):
 		"""
 		Evaluates for a collection of particles. If parallel is set to true, then
 		it uses the available cores as initialized with the eki object.
@@ -180,7 +185,7 @@ class eki(object):
 		gs = model.statistics(ws)
 		return np.concatenate([gs, ws[-1]])
 
-	def Gpar_pde(self, theta, model, t):
+	def G_pde_ens(self, theta, model, t):
 		if self.parallel:
 			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T,
 					desc = 'Model evaluations: ',
@@ -295,7 +300,7 @@ class eki(object):
 
 class flow(eki):
 
-	def run(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
+	def run(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF
@@ -308,7 +313,7 @@ class flow(eki):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
@@ -326,7 +331,7 @@ class flow(eki):
 		self.t = []
 
 		for i in tqdm(range(self.T)):
-			Geval = self.Gpar(U0, model)
+			Geval = self.G_ens(U0, model)
 
 			# For ensemble update
 			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -364,9 +369,9 @@ class flow(eki):
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
-		self.Gstar = self.Gpar(self.Ustar, model)
+		self.Gstar = self.G_ens(self.Ustar, model)
 
-	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
+	def run_sde(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF
@@ -379,7 +384,7 @@ class flow(eki):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
@@ -398,7 +403,7 @@ class flow(eki):
 		self.t = []                 # Tracks simulated time
 
 		for i in tqdm(range(self.T)):
-			Geval = self.Gpar(U0, model)
+			Geval = self.G_ens(U0, model)
 
 			# For ensemble update
 			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -439,8 +444,7 @@ class flow(eki):
 
 		self.Uall = np.asarray(self.Uall)
 
-	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise,
-				save_online = False, verbose = True):
+	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise, save_online = False):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF.
@@ -453,7 +457,6 @@ class flow(eki):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
 
 		Outputs:
 		- None
@@ -485,38 +488,12 @@ class flow(eki):
 			self.metrics['t'] = []
 
 		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 0):
-			Geval = self.Gpar_pde(np.vstack([U0, self.W0]), model, t)
+			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
 			self.Gall.append(Geval)
 			self.W0 = Geval[self.n_obs:,:]
 			Geval = Geval[:self.n_obs,:]
 
-			# For ensemble update
-			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-			R = Geval - y_obs[:,np.newaxis]
-			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-
-			# Track metrics
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			hk = 1./self.radspec[-1]
-			if i == 0:
-				self.metrics['t'].append(hk)
-			else:
-				self.metrics['t'].append(hk + self.metrics['t'][-1])
-			Umean = U0.mean(axis = 1)[:, np.newaxis]
-			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-
-			Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
-				U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
-			Uk = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-				np.random.normal(0, 1, [self.p, self.J])))
-
-			self.Uall.append(Uk)
-			U0 = Uk
+			U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
 
 			if save_online:
 				try:
@@ -539,7 +516,7 @@ class flow(eki):
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
-		Geval = self.Gpar_pde(np.vstack([self.Ustar, self.W0]), model, t)
+		Geval = self.G_pde_ens(np.vstack([self.Ustar, self.W0]), model, t)
 		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
 		self.W0 = Geval[self.n_obs:,:]
 		self.Gstar = Geval[:self.n_obs,:]
@@ -549,7 +526,7 @@ class flow(eki):
 		except AttributeError:
 			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '/'
 
-	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
+	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF
@@ -562,7 +539,7 @@ class flow(eki):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
@@ -582,7 +559,7 @@ class flow(eki):
 		self.t = []
 
 		for i in tqdm(range(self.T)):
-			Geval = self.Gpar(np.vstack([U0, self.W0]), model, t)
+			Geval = self.G_ens(np.vstack([U0, self.W0]), model, t)
 			self.W0 = Geval[self.n_obs:,:]
 			Geval = Geval[:self.n_obs,:]
 
@@ -624,11 +601,42 @@ class flow(eki):
 
 		self.Uall = np.asarray(self.Uall)
 
+	def eks_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+
+		# Track metrics
+		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+
+		self.radspec.append(np.linalg.eigvals(D).real.max())
+		hk = 1./self.radspec[-1]
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
+			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
+		Uk     = np.abs(Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+			np.random.normal(0, 1, [self.p, self.J])))
+
+		self.Uall.append(Uk)
+		U0 = Uk
+
+		return U0
+
 # ------------------------------------------------------------------------------
 
 class iterative(eki):
 
-	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise, verbose = True):
+	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the iterative EnKF
 
@@ -640,7 +648,7 @@ class iterative(eki):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
@@ -661,10 +669,12 @@ class iterative(eki):
 
 		for i in tqdm(range(self.T)):
 
-			Geval = self.Gpar(np.vstack([U0, self.W0]), model, t)
+			Geval = self.G_ens(np.vstack([U0, self.W0]), model, t)
 			self.W0 = Geval[self.n_obs:,:]
 			Geval = Geval[:self.n_obs,:]
 
+
+			# Here starts the ensemble update ----------------------------------
 			# For ensemble update
 			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
 			R = U0 - U0.mean(axis = 1)[:,np.newaxis]
@@ -690,12 +700,13 @@ class iterative(eki):
 
 			self.Uall.append(Uk)
 			U0 = Uk
+			# Here ends the ensemble update ------------------------------------
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
-		self.Gstar = self.Gpar(self.Ustar, model)
+		self.Gstar = self.G_ens(self.Ustar, model)
 
-	def run_nopar(self, y_obs, U0, model, Gamma, Jnoise, verbose = True):
+	def run_nopar(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the iterative EnKF
 
@@ -707,7 +718,7 @@ class iterative(eki):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
@@ -726,7 +737,7 @@ class iterative(eki):
 		self.t = []
 
 		for i in tqdm(range(self.T)):
-			Geval = self.Gpar(U0, model)
+			Geval = self.G_ens(U0, model)
 
 			# For ensemble update
 			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -759,9 +770,9 @@ class iterative(eki):
 
 		self.Uall = np.asarray(self.Uall)
 		self.Ustar = self.Uall[-1]
-		self.Gstar = self.Gpar(self.Ustar, model)
+		self.Gstar = self.G_ens(self.Ustar, model)
 
-	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise, verbose = True):
+	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the iterative EnKF
 
@@ -773,7 +784,7 @@ class iterative(eki):
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
-		- verbose: (boolean) If true, print progress during iterations.
+
 
 		Outputs:
 		- None
@@ -794,7 +805,7 @@ class iterative(eki):
 
 		for i in tqdm(range(self.T)):
 
-			Geval = self.Gpar(np.vstack([U0, self.W0]), model, t)
+			Geval = self.G_ens(np.vstack([U0, self.W0]), model, t)
 			self.W0 = Geval[self.n_obs:,:]
 			Geval = Geval[:self.n_obs,:]
 
