@@ -280,7 +280,7 @@ class eki(object):
 
 class flow(eki):
 
-	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, **kwargs):
+	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EnKF.
@@ -307,23 +307,27 @@ class flow(eki):
 		except AttributeError:
 			self.directory = os.getcwd()
 
-		try:
-			getattr(self, 'Uall')
-			self.Uall = list(self.Uall)
-			self.Gall = list(self.Gall)
+		if trace:
+			try:
+				getattr(self, 'Uall')
+				self.Uall = list(self.Uall)
+				self.Gall = list(self.Gall)
 
+			except AttributeError:
+				# Storing the ensemble members
+				self.Uall = []; self.Uall.append(U0)
+				self.Gall = [];
+
+		if model.type == 'pde':
+			wt = kwargs.get('wt', None)
+			t  = kwargs.get('t', None)
+			self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
+
+		try :
+			getattr(self, 'metrics')
 		except AttributeError:
-			if model.type == 'pde':
-				wt = kwargs.get('wt', None)
-				t  = kwargs.get('t', None)
-				self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
-
-			# Storing the ensemble members
-			self.Uall = []; self.Uall.append(U0)
-			self.Gall = [];
-			self.radspec = []
-
 			# Storing metrics
+			self.radspec = []
 			self.metrics = dict()
 			self.metrics['v'] = []			# Tracks collapse in parameter space
 			self.metrics['V'] = []			# Tracks collapse after forward model evaln
@@ -340,7 +344,9 @@ class flow(eki):
 			else:
 				break
 
-			self.Gall.append(Geval)
+			if trace:
+				self.Gall.append(Geval)
+				
 			Geval = Geval[:self.n_obs,:]
 
 			U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
@@ -364,8 +370,11 @@ class flow(eki):
 			if self.metrics['t'][-1] > 2:
 				break
 
-		self.Uall = np.asarray(self.Uall)
-		self.Ustar = self.Uall[-1]
+		if trace:
+			self.Uall = np.asarray(self.Uall)
+			self.Ustar = self.Uall[-1]
+		else:
+			self.Ustar = U0
 
 		if model.type == 'pde':
 			Geval = self.G_pde_ens(np.vstack([self.Ustar, self.W0]), model, t)
@@ -373,7 +382,9 @@ class flow(eki):
 		elif model.type == 'map':
 			Geval = self.G_ens(self.Ustar, model)
 
-		self.Gall.append(Geval); self.Gall = np.array(self.Gall)
+		if trace:
+			self.Gall.append(Geval); self.Gall = np.array(self.Gall)
+
 		self.Gstar = Geval[:self.n_obs,:]
 
 		try:
@@ -530,17 +541,18 @@ class flow(eki):
 
 		self.Uall = np.asarray(self.Uall)
 
-	def eks_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+	def eks_update(self, y_obs, U0, Geval, Gamma, iter, trace = True, **kwargs):
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
 		R = Geval - y_obs[:,np.newaxis]
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		if trace:
+			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		self.radspec.append(np.linalg.eigvals(D).real.max())
 		hk = 1./self.radspec[-1]
