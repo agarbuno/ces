@@ -47,6 +47,25 @@ class eki(object):
 
 		return str()
 
+	def run(self, y_obs, U0, model, Gamma, Jnoise):
+		"""
+		Find the minimizer of an inverse problem using the continuous time limit
+		of the EnKF.
+
+		Inputs:
+		- U0: A numpy array of shape (p, J) initial ensemble; there are J
+			ensemble particles each of dimension p.
+		- y_obs: A numpy array of shape (n_obs,) of observed data.
+		- wt: A numpy array of initial conditions to start the ensemble when
+			evaluating the forward model
+		- t: A numpy array of time points where the ODE is evaluated
+		- ...
+
+		Outputs:
+		- None
+		"""
+		pass
+
 	def run_sde(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
 		Find the minimizer of an inverse problem using the continuous time limit
@@ -61,25 +80,6 @@ class eki(object):
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
 
-
-		Outputs:
-		- None
-		"""
-		pass
-
-	def run(self, y_obs, U0, model, Gamma, Jnoise):
-		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF.
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
 
 		Outputs:
 		- None

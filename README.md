@@ -11,7 +11,7 @@ import sys
 sys.path.append('Your path/ipuq/')
 
 from ces.utils import *
-from ces.enka import *
+from ces.calibrate import *
 ```
 ---
 
@@ -21,7 +21,7 @@ Overview of this module:
 and PDEs constrained functions. The goal is to solve inverse problems through an approximate Bayesian method.  
 
 Coming shortly:
-- MCMC 
+- MCMC
 - Accelerated MCMC using GPs.
 
 Dependencies:
