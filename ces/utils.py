@@ -121,8 +121,8 @@ class lorenz63(object):
 		gs = [np.asarray(pd.Series(k).rolling(window = int(self.l_window * self.freq) ).mean()) for k in ws]
 		gs = np.asarray(gs)[:,-1]
 		# With adyacent windows
-		# gs = np.asarray(ws)[:,1:].reshape(self.n_obs, -1,
-			# int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
+		gs = np.asarray(ws)[:,1:].reshape(self.n_obs, -1,
+			int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
 		return gs
 
 class lorenz96(object):
