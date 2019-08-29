@@ -313,6 +313,8 @@ class flow(eki):
 		except AttributeError:
 			self.directory = os.getcwd()
 
+		__update = kwargs.get('update', 'eks')
+
 		if trace:
 			try:
 				getattr(self, 'Uall')
@@ -355,7 +357,10 @@ class flow(eki):
 
 			Geval = Geval[:self.n_obs,:]
 
-			U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
+			if __update == 'eks':
+				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
+			elif __update == 'eks_corrected':
+				U0 = self.eks_update_corrected(y_obs, U0, Geval, Gamma, i)
 
 			if save_online:
 				try:
@@ -384,11 +389,9 @@ class flow(eki):
 
 		if trace:
 			self.Uall = np.asarray(self.Uall)
-			self.Ustar = self.Uall[-1]
 			self.Gall.append(Geval); self.Gall = np.array(self.Gall)
-		else:
-			self.Ustar = U0
 
+		self.Ustar = U0
 		self.Gstar = Geval[:self.n_obs,:]
 
 		try:
@@ -573,6 +576,42 @@ class flow(eki):
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
 			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
 		Uk     = np.abs(Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+			np.random.normal(0, 1, [self.p, self.J])))
+
+		if trace:
+			self.Uall.append(Uk)
+
+		return Uk
+
+	def eks_update_corrected(self, y_obs, U0, Geval, Gamma, iter, trace = True, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		"""
+
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+
+		# Track metrics
+		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.radspec.append(np.linalg.eigvals(D).real.max())
+
+		hk = 1./self.radspec[-1]
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
+			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)) + \
+			hk * (self.p + 1)/self.J * (U0 - Umean))
+		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
 		if trace:

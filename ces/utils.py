@@ -2,6 +2,33 @@ import numpy as np
 import pandas as pd
 from scipy import integrate
 
+class lineal(object):
+	"""
+	"""
+	def __init__(self, A, flag_noise = False):
+		"""
+		"""
+		self.A = A
+		self.n_obs = A.shape[0]
+		self.flag_noise = flag_noise
+		self.noise_sigma = 0.1
+		self.model_name = 'lineal'
+		self.type = 'map'
+
+	def __repr__(self):
+		return self.model_name
+
+	def __str__(self):
+		return self.model_name + str(self.n_state)
+
+	def __call__(self, theta):
+		"""
+		"""
+		if self.flag_noise:
+			return np.matmul(self.A, theta) + self.noise_sigma * np.random.normal()
+		else:
+			return np.matmul(self.A, theta)
+
 def banana(u, a = 1., b = .5, flag_noise = False):
 	rho = 0.95
 	Gamma = np.identity(2)
