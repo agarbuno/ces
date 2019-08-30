@@ -365,9 +365,11 @@ class flow(enka):
 
 		try:
 			getattr(self, 'nexp')
-			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
+			self.online_path = self.directory+'/ensembles/'+model.model_name + \
+					'_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
 		except AttributeError:
-			self.online_path = self.directory+'/ensembles/'+model.model_name + '_' + str(self.J).zfill(4)+ '/'
+			self.online_path = self.directory+'/ensembles/'+model.model_name + \
+					'_' + str(self.J).zfill(4)+ '/'
 
 	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, save_online = False):
 		"""
