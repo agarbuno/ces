@@ -11,7 +11,7 @@ from scipy import integrate
 from joblib import Parallel, delayed
 import multiprocessing
 
-class eki(object):
+class enka(object):
 
 	def __init__(self, p, n_obs, J):
 		self.n_obs     = n_obs        # Dimensionality of statistics (observations)
@@ -20,12 +20,14 @@ class eki(object):
 		self.epsilon   = 1e-7         # Underflow protection
 		self.T         = 30           # Number of maximum iterations
 		self.num_cores = multiprocessing.cpu_count()
-		self.scaled    = False
 		self.parallel  = False
 		self.mute_bar  = True
 
 	def __repr__(self):
-		return 'eki' + '-' + str(self.J).zfill(4)
+		try:
+			return 'enka' + '-' + str(self.J).zfill(4) + '-%s'gettatr(self.__update)
+		except AttributeError:
+			return 'enka' + '-' + str(self.J).zfill(4) + '-eks'
 
 	def __str__(self):
 		print(r'Number of parameters ................. %s'%(self.p))
@@ -126,7 +128,7 @@ class eki(object):
 	def G_ens(self, theta, model):
 		"""
 		Evaluates for a collection of particles. If parallel is set to true, then
-		it uses the available cores as initialized with the eki object.
+		it uses the available cores as initialized with the enka object.
 		Inputs:
 			- theta: [p, N] array where N is the number of particles to be evaluated
 				and p is the dimensionality of the parameters.
@@ -144,7 +146,7 @@ class eki(object):
 	def G_pde(self, k, model, t):
 		"""
 		Forward model for PDE constrained inverse problem. If parallel is set to
-		true, then it uses the available cores as initialized with the eki object.
+		true, then it uses the available cores as initialized with the enka object.
 		(WARNING): Hope to be more general now!
 
 		Inputs:
@@ -178,39 +180,6 @@ class eki(object):
 			for ii, k in enumerate(theta.T):
 				Gs[:, ii] = self.G_pde(k, model, t)
 			return Gs
-
-	def scale_ensemble(self, factor = 2.):
-		self.scale_mean = self.Ustar.mean(axis = 1)[:, np.newaxis]
-		self.scale_cov = factor * np.linalg.cholesky(np.cov(self.Ustar))
-		self.scale_X = np.linalg.solve(self.scale_cov, self.Ustar - self.scale_mean)
-		self.scaled = True
-
-	def predict_gps(self, X):
-		"""
-		Prediction using independent GP models for multioutput code.
-		Eventually, we will either decorrelate or learn a multioutput emulator.
-
-		Inputs:
-		- gpmodels: list of independent GP models.
-		- X: numpy array with dimensions [n_points, d].
-			- n_points: number of training points.
-			- d: dimensionality of the parameter vector.
-		"""
-		gpmeans = np.empty(shape = (len(self.gpmodels), len(X)))
-		gpvars = np.empty(shape = (len(self.gpmodels), len(X)))
-
-		#print('Computing GP predictions for every component.')
-		for ii, model in enumerate(self.gpmodels):
-			if not self.scaled:
-				mean_pred, var_pred = model.predict_y(X)
-			else:
-				mean_pred, var_pred = model.predict_y(np.linalg.solve(self.scale_cov,
-				X.T - self.scale_mean).T)
-			gpmeans[ii,:] = mean_pred.flatten()
-			gpvars[ii,:] = var_pred.flatten()
-
-		#print('Prediction done...\n')
-		return [gpmeans, gpvars]
 
 	def save(self, path = './', file = 'ces/', all = False, reset = True, online = False, counter = 0):
 		"""
@@ -278,7 +247,7 @@ class eki(object):
 
 # ------------------------------------------------------------------------------
 
-class flow(eki):
+class flow(enka):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
@@ -313,7 +282,7 @@ class flow(eki):
 		except AttributeError:
 			self.directory = os.getcwd()
 
-		__update = kwargs.get('update', 'eks')
+		self.__update = kwargs.get('update', 'eks')
 
 		if trace:
 			try:
@@ -357,9 +326,9 @@ class flow(eki):
 
 			Geval = Geval[:self.n_obs,:]
 
-			if __update == 'eks':
+			if  self.__update == 'eks':
 				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
-			elif __update == 'eks_corrected':
+			elif self.__update == 'eks_corrected':
 				U0 = self.eks_update_corrected(y_obs, U0, Geval, Gamma, i)
 
 			if save_online:
@@ -621,7 +590,7 @@ class flow(eki):
 
 # ------------------------------------------------------------------------------
 
-class iterative(eki):
+class iterative(enka):
 
 	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise):
 		"""
