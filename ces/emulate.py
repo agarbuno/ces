@@ -32,6 +32,8 @@ def predict_gps(enka, X, mute_bar = True, **kwargs):
 
 	if kwargs.get('gpmodels', None) is None:
 		gpmodels = enka.gpmodels
+	else:
+		gpmodels = kwargs.get('gpmodels', None)
 
 	gpmeans = np.empty(shape = (len(gpmodels), len(X)))
 	gpvars  = np.empty(shape = (len(gpmodels), len(X)))
