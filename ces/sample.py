@@ -72,31 +72,34 @@ class MCMC(object):
 		self.samples = np.array(samples).T
 		self.accept  = accept/n_mcmc
 
-	def model_rw(self, n_mcmc, wt, model, prior, enka, Gamma, delta = 1., enka_scaling = True):
+	def model_rw(self, n_mcmc, model, prior, enka, Gamma, delta = 1., enka_scaling = True):
 		if enka_scaling:
 			scales = delta * np.linalg.cholesky(np.cov(enka.Ustar))
 		else:
 			scales = delta * np.eye(enka.p)
 
 		current = enka.Ustar.mean(axis = 1)
-		w_mcmc  = np.copy(wt)
+		w_mcmc  = np.copy(model.wt)
 
-		g = enka.G_pde(np.hstack([current.flatten(), w_mcmc]), model, t)
+		g = enka.G_pde(np.hstack([current.flatten(), w_mcmc]), model, model.t)
 		w_mcmc = np.copy(g[enka.n_obs:])
 
-		phi_current = ((g[:enka.n_obs] - y_obs) * np.linalg.solve(2 * Gamma, g[:enka.n_obs] - y_obs)).sum()
+		yg = g[:enka.n_obs] - self.y_obs
+		phi_current = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 		phi_current -= prior.logpdf(current.flatten())
 
+		samples = []
 		samples.append(current.flatten())
 		accept = 0.
 
 		for kk in tqdm(range(n_mcmc), desc ='MCMC samples: ', disable = self.mute_bar):
-			proposal   = current + np.matmul(scales, np.random.normal(0, 1, (enka.p,1)))
+			proposal   = current + np.matmul(scales, np.random.normal(0, 1, enka.p))
 
-			g_proposal =  enka.G_pde(np.hstack([proposal.flatten(), w_mcmc]), model, t)
+			g_proposal =  enka.G_pde(np.hstack([proposal.flatten(), w_mcmc]), model, model.t)
 			w_mcmc = np.copy(g_proposal[enka.n_obs:])
 
-			phi_proposal  = ((g_proposal[:enka.n_obs] - y_obs) * np.linalg.solve(2 * Gamma, g_proposal[:enka.n_obs] - y_obs)).sum()
+			yg = g_proposal[:enka.n_obs] - self.y_obs
+			phi_proposal  = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 			phi_proposal -= prior.logpdf(proposal.flatten())
 
 			if np.random.uniform() < np.exp(phi_current - phi_proposal):
