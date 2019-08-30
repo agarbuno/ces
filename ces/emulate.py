@@ -13,7 +13,7 @@ def scale_ensemble(enka, factor = 2.):
 	enka.scale['cov']  = factor * np.linalg.cholesky(np.cov(enka.Ustar))
 	enka.scale['X']    = np.linalg.solve(enka.scale_cov, enka.Ustar - enka.scale_mean)
 
-def predict_gps(enka, X, mute_bar = True):
+def predict_gps(enka, X, mute_bar = True, **kwargs):
 	"""
 	Prediction using independent GP models for multioutput code.
 	Eventually, we will either decorrelate or learn a multioutput emulator.
@@ -25,15 +25,18 @@ def predict_gps(enka, X, mute_bar = True):
 		- d: dimensionality of the parameter vector.
 	"""
 	try:
-		gettatr(enka, 'gpmodels')
+		getattr(enka, 'gpmodels')
 	except AttributeError:
 		tqdm.write('There are no trained GP model(s) in object: %s'%enka)
 		return ''
 
-	gpmeans = np.empty(shape = (len(enka.gpmodels), len(X)))
-	gpvars  = np.empty(shape = (len(enka.gpmodels), len(X)))
+	if kwargs.get('gpmodels', None) is None:
+		gpmodels = enka.gpmodels
 
-	for ii, model in tqdm(enumerate(enka.gpmodels),
+	gpmeans = np.empty(shape = (len(gpmodels), len(X)))
+	gpvars  = np.empty(shape = (len(gpmodels), len(X)))
+
+	for ii, model in tqdm(enumerate(gpmodels),
 			desc = 'GP predictions',
 			disable = mute_bar,
 			position = 0):

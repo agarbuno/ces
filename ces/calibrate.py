@@ -25,7 +25,7 @@ class enka(object):
 
 	def __repr__(self):
 		try:
-			return 'enka' + '-' + str(self.J).zfill(4) + '-%s'gettatr(self.__update)
+			return 'enka' + '-' + str(self.J).zfill(4) + '-%s'%getattr(self.__update)
 		except AttributeError:
 			return 'enka' + '-' + str(self.J).zfill(4) + '-eks'
 
