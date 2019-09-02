@@ -581,8 +581,8 @@ class flow(enka):
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 		# This is a temporal solution is very hardcoded! -----------------------
-		Jacobian = 0.0 * Uk
-		Jacobian[2] = -np.exp(-Uk[2])
+		Jacobian = 0.0 * U0
+		Jacobian[2] = -np.exp(-U0[2])
 		# ----------------------------------------------------------------------
 
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
