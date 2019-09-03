@@ -326,7 +326,7 @@ class flow(enka):
 
 			Geval = Geval[:self.n_obs,:]
 
-			if  self.__update == 'eks':
+			if   self.__update == 'eks':
 				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
 			elif self.__update == 'eks-corrected':
 				U0 = self.eks_update_corrected(y_obs, U0, Geval, Gamma, i)
@@ -548,7 +548,7 @@ class flow(enka):
 
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
 			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
-		Uk     = np.abs(Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
 		if trace:
