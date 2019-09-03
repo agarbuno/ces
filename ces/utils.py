@@ -136,7 +136,7 @@ class lorenz96(object):
 		- solve: here we define the method we need to solve the model.
 		- statistics: here we define the relevant statistics to be computed.
 	"""
-	def __init__(self, n_slow = 36, n_fast = 10, l_window = 10, freq = 100, spinup = 10):
+	def __init__(self, n_slow = 36, n_fast = 10, l_window = 10, freq = 10, spinup = 10):
 		"""
 		Lorenz 96 model initilization
 		"""
