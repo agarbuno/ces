@@ -125,6 +125,39 @@ class lorenz63(object):
 			int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
 		return gs
 
+class lorenz63_log(lorenz63):
+	def __init__(self, l_window = 10, freq = 100):
+		super().__init__(l_window = l_window, freq = freq)
+		self.model_name = 'lorenz63_log'
+
+	def __call__(self, w, t, log_r = np.log(28.), log_b = np.log(8./3)):
+		"""
+		Reduced Lorenz 63 model with 2 parameters.
+		(WARNING): This should be edited somehow to be able to reduce the model
+				in an arbitrary way.
+		"""
+		x_dot, y_dot, z_dot = self.model(w, t, 10., log_r, log_b)
+		return [x_dot, y_dot, z_dot]
+
+	def model(self, w, t, sigma = 10., log_r = np.log(28.), log_b = np.log(8./3)):
+		"""
+		Original Lorenz 63 model with 3 parameters
+		"""
+		r = np.exp(log_r)
+		b = np.exp(log_b)
+
+		x, y, z = w
+		x_dot = sigma * (y - x)
+		y_dot = r * x - y - x * z
+		z_dot = x * y - b * z
+		return [x_dot, y_dot, z_dot]
+
+	def grad_logjacobian(self, params):
+			return -np.exp(-params)
+
+	def logjacobian(self, params):
+			return - params.sum(axis = 0)
+
 class lorenz96(object):
 	"""
 	Lorenz 96 model. PDE model structure:

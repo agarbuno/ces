@@ -41,6 +41,11 @@ class MCMC(object):
 
 		phi_current  = (yG * np.linalg.solve(2 * Sigma, yG)).sum()
 		phi_current -= prior.logpdf(current)
+
+		if kwargs.get('model', None) is not None:
+			model = kwargs.get('model', None)
+			phi_current -= model.logjacobian(current)
+
 		if kwargs.get('Gamma', None) is None:
 			phi_current += .5 * np.log(gvars).sum()
 		samples.append(current)
@@ -59,6 +64,10 @@ class MCMC(object):
 
 			phi_proposal  = (yGproposal * np.linalg.solve(2 * Sigma, yGproposal)).sum()
 			phi_proposal -= prior.logpdf(proposal)
+
+			if kwargs.get('model', None) is not None:
+				phi_proposal -= model.logjacobian(proposal)
+
 			if kwargs.get('Gamma', None) is None:
 				phi_proposal += .5 * np.log(gvars_proposal).sum()
 
@@ -87,6 +96,7 @@ class MCMC(object):
 		yg = g[:enka.n_obs] - self.y_obs
 		phi_current = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 		phi_current -= prior.logpdf(current.flatten())
+		phi_current -= model.logjacobian(current.flatten())
 
 		samples = []
 		samples.append(current.flatten())
@@ -101,6 +111,7 @@ class MCMC(object):
 			yg = g_proposal[:enka.n_obs] - self.y_obs
 			phi_proposal  = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 			phi_proposal -= prior.logpdf(proposal.flatten())
+			phi_proposal -= model.logjacobian(proposal.flatten())
 
 			if np.random.uniform() < np.exp(phi_current - phi_proposal):
 				current     = proposal
