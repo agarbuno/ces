@@ -274,6 +274,9 @@ class lorenz96(object):
 		return Phi[:,-1]
 
 class lorenz96Fc(lorenz96):
+	def __init__(self):
+		super().__init__()
+
 	def __repr__(self):
 		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(2)
 
@@ -366,29 +369,3 @@ def lorenz96_dim(t, X, h = 1., F = 10., c = 2**7., b = 1.):
 					c * Y[j] + c * X[int(j / n_fast)]
 
 	return np.hstack((dXdt, dYdt))
-
-def scale_gppreds(gpmeans, gpvars, Gmean, Gstd):
-	"""
-	Inputs:
-	- gpmeans: list
-	- gpvars: list
-	- Gmean: numpy array with means used to rescale output due to parameter variability
-	- Gstd: numpy array with stds used to rescale output due to parameter variability
-	"""
-	n_obs = len(gpmeans)
-
-	Gmeans = []
-	Gvars = []
-
-	for ii in range(len(gpmeans)):
-		if ii in range(2,7):
-			mexp = np.exp(gpmeans[ii] * Gstd[ii] + Gmean[ii] + (Gstd[ii]**2 * gpvars[ii])/2)
-			vexp = (np.exp(Gstd[ii]**2 * gpvars[ii]) - 1.) * (mexp**2)
-		else :
-			mexp = gpmeans[ii] * Gstd[ii] + Gmean[ii]
-			vexp = Gstd[ii]**2 * gpvars[ii]
-
-		Gmeans.append(mexp)
-		Gvars.append(vexp)
-
-	return [np.asarray(Gmeans).reshape(n_obs, -1), np.asarray(Gvars).reshape(n_obs, -1)]

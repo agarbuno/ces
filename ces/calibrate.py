@@ -312,7 +312,7 @@ class flow(enka):
 			self.metrics['r'] = []			# Tracks the collapse towards the truth
 			self.metrics['t'] = []
 
-		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 0):
+		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 1):
 			if model.type == 'pde':
 				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
 				self.W0 = Geval[self.n_obs:,:]
@@ -550,7 +550,7 @@ class flow(enka):
 
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
 			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
-		Uk     = np.abs(Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
 		if trace:
