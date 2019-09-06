@@ -3,11 +3,11 @@ import pandas as pd
 from scipy import integrate
 import matlab.engine
 from tqdm.autonotebook import tqdm
+from joblib import Parallel, delayed
+import multiprocessing
 
 class model(object):
 	def __init__(self, alpha = 2., tau  = 3., Nmesh = 2.**4):
-		self.eng = matlab.engine.start_matlab()
-		self.eng.addpath(r'./../mfiles','-end');
 		self.alpha = alpha
 		self.tau   = tau
 		self.Nmesh = Nmesh
@@ -24,22 +24,33 @@ class model(object):
 		"""
 		theta = self.eval_rf(xi)
 		U     = self.solve_pde(theta)
-
 		if full_solution:
 			return np.asarray(U).flatten()
 		else:
 			return np.asarray(U).flatten()[self.obs_index]
 
+	def start(self):
+		self.eng = matlab.engine.start_matlab("-nojvm -nosplash")
+		self.eng.addpath(r'./../mfiles','-end');
+
+	def stop(self):
+		self.eng.quit()
+		del self.eng
+
 	def set_rnd_seed(self, seed = 1):
 		self.eng.rng('default');
 		self.eng.rng(seed)
 
-	def stop(self):
-		self.eng.exit()
-
 	def set_initial(self, seed = 1):
 		np.random.seed(seed)
 		self.ustar  = np.random.normal(0, 1, int(self.p))
+
+	def set_rank(self):
+		k = np.concatenate((np.arange(6), 100 * np.arange(6, int(self.Nmesh))))
+		K1, K2 = np.meshgrid(k, k)
+		self.eigs = (self.tau**(self.alpha-1))*(np.pi**2 * (K1**2 + K2**2) + self.tau**2)**(-self.alpha/2)
+		self.eigs[0,0] = 1e-10
+		self.rank = (-self.eigs).flatten().argsort()
 
 	def eval_rf(self, xi):
 		"""

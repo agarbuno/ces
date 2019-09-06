@@ -135,11 +135,19 @@ class enka(object):
 			- model: model name for the forward model.
 		"""
 		if self.parallel:
-			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G)(k, model) for k in theta.T)
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G)(k, model) for k in tqdm(theta.T,
+				desc = 'Model evaluations: ',
+				disable = self.mute_bar,
+				leave = False,
+				position = 1))
 			return (np.asarray(Geval).T)
 		else:
 			Gs = np.zeros((self.n_obs, theta.shape[1]))
-			for ii, k in enumerate(theta.T):
+			for ii, k in tqdm(enumerate(theta.T),
+					desc = 'Model evaluations: ',
+					disable = self.mute_bar,
+					leave = True,
+					position = 1):
 				Gs[:, ii] = model(k)
 			return Gs
 

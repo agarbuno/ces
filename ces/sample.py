@@ -14,7 +14,7 @@ class MCMC(object):
 	def __init__(self):
 		self.mute_bar = False
 
-	def gp_rw(self, enka, n_mcmc, prior, delta = 1., enka_scaling = True, **kwargs):
+	def gp_mh(self, enka, n_mcmc, prior, delta = 1., enka_scaling = True, **kwargs):
 		"""
 		GP-based Random Walk Metropolis Hastings.
 		Inputs:
@@ -81,37 +81,52 @@ class MCMC(object):
 		self.samples = np.array(samples).T
 		self.accept  = accept/n_mcmc
 
-	def model_rw(self, n_mcmc, model, prior, enka, Gamma, delta = 1., enka_scaling = True):
+	def model_mh(self, n_mcmc, model, prior, enka, Gamma, delta = 1., enka_scaling = True, **kwargs):
 		if enka_scaling:
 			scales = delta * np.linalg.cholesky(np.cov(enka.Ustar))
 		else:
 			scales = delta * np.eye(enka.p)
 
 		current = enka.Ustar.mean(axis = 1)
-		w_mcmc  = np.copy(model.wt)
 
-		g = enka.G_pde(np.hstack([current.flatten(), w_mcmc]), model, model.t)
-		w_mcmc = np.copy(g[enka.n_obs:])
+		if model.type == 'pde':
+			w_mcmc  = np.copy(model.wt)
+			g = enka.G_pde(np.hstack([current.flatten(), w_mcmc]), model, model.t)
+			w_mcmc = np.copy(g[enka.n_obs:])
+		else:
+			g = enka.G(current.flatten(), model)
 
 		yg = g[:enka.n_obs] - self.y_obs
 		phi_current = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 		phi_current -= prior.logpdf(current.flatten())
-		phi_current -= model.logjacobian(current.flatten())
+		try:
+			phi_current -= model.logjacobian(current.flatten())
+		except AttributeError:
+			pass
 
 		samples = []
 		samples.append(current.flatten())
 		accept = 0.
 
 		for kk in tqdm(range(n_mcmc), desc ='MCMC samples: ', disable = self.mute_bar):
-			proposal   = current + np.matmul(scales, np.random.normal(0, 1, enka.p))
+			if kwargs.get('update', None) is None:
+				proposal = self.random_walk(current, scales, enka.p)
+			elif kwargs.get('update', None) == 'pCN':
+				proposal = self.pCN(current, scales, enka.p, beta = kwargs.get('beta', 0.5))
 
-			g_proposal =  enka.G_pde(np.hstack([proposal.flatten(), w_mcmc]), model, model.t)
-			w_mcmc = np.copy(g_proposal[enka.n_obs:])
+			if model.type == 'pde':
+				g_proposal =  enka.G_pde(np.hstack([proposal.flatten(), w_mcmc]), model, model.t)
+				w_mcmc = np.copy(g_proposal[enka.n_obs:])
+			else:
+				g_proposal =  enka.G(proposal.flatten(), model)
 
 			yg = g_proposal[:enka.n_obs] - self.y_obs
 			phi_proposal  = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 			phi_proposal -= prior.logpdf(proposal.flatten())
-			phi_proposal -= model.logjacobian(proposal.flatten())
+			try:
+				phi_proposal -= model.logjacobian(proposal.flatten())
+			except AttributeError:
+				pass
 
 			if np.random.uniform() < np.exp(phi_current - phi_proposal):
 				current     = proposal
@@ -122,3 +137,9 @@ class MCMC(object):
 
 		self.samples = np.array(samples).T
 		self.accept  = accept/n_mcmc
+
+	def random_walk(self, current, scales, n_dim):
+		return current + np.matmul(scales, np.random.normal(0, 1, n_dim))
+
+	def pCN(self, current, scales, n_dim, beta = 0.5):
+		return np.sqrt(1 - beta**2) * current + np.sqrt(beta) * np.matmul(scales, np.random.normal(0, 1, n_dim))
