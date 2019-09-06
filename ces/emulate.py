@@ -35,21 +35,32 @@ def predict_gps(enka, X, mute_bar = True, **kwargs):
 	else:
 		gpmodels = kwargs.get('gpmodels', None)
 
-	gpmeans = np.empty(shape = (len(gpmodels), len(X)))
-	gpvars  = np.empty(shape = (len(gpmodels), len(X)))
+	if kwargs.get('separable', False):
+		gpmeans = np.empty(shape = (kwargs.get('model').n_obs,1))
+		gpvars = np.empty(shape =  (kwargs.get('model').n_obs,1))
+	else:
+		gpmeans = np.empty(shape = (len(gpmodels), len(X)))
+		gpvars  = np.empty(shape = (len(gpmodels), len(X)))
 
-	for ii, model in tqdm(enumerate(gpmodels),
-			desc = 'GP predictions',
-			disable = mute_bar,
-			position = 0):
-		try:
-			getattr(enka, 'scaled')
-			mean_pred, var_pred = model.predict_y(np.linalg.solve(enka.scale['cov'], X.T - enka.scale['mean']).T)
-		except AttributeError:
-			mean_pred, var_pred = model.predict_y(X)
+	if kwargs.get('separable', False):
+		model = kwargs.get('model', None)
+		print(np.repeat(X, model.n_obs).reshape(-1,1).shape)
+		print(model.obs_locs.T.shape)
+		gpmeans, gpvars = gpmodels[0].predict_y(np.hstack([np.repeat(X, model.n_obs).reshape(-1,1), model.obs_locs.T]))
+		gpmeans, gpvars = gpmeans.flatten(), gpvars.flatten()
+	else:
+		for ii, model in tqdm(enumerate(gpmodels),
+				desc = 'GP predictions',
+				disable = mute_bar,
+				position = 0):
+			try:
+				getattr(enka, 'scaled')
+				mean_pred, var_pred = model.predict_y(np.linalg.solve(enka.scale['cov'], X.T - enka.scale['mean']).T)
+			except AttributeError:
+				mean_pred, var_pred = model.predict_y(X)
 
-		gpmeans[ii,:] = mean_pred.flatten()
-		gpvars[ii,:] = var_pred.flatten()
+			gpmeans[ii,:] = mean_pred.flatten()
+			gpvars[ii,:] = var_pred.flatten()
 
 	return [gpmeans, gpvars]
 
