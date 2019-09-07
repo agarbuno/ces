@@ -328,7 +328,7 @@ class flow(enka):
 			elif model.type == 'map':
 				Geval = self.G_ens(U0, model)
 			else:
-				break
+				break # Raise an error
 
 			if trace:
 				self.Gall.append(Geval)
