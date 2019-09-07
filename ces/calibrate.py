@@ -323,7 +323,8 @@ class flow(enka):
 		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 1):
 			if model.type == 'pde':
 				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
-				self.W0 = Geval[self.n_obs:,:]
+				if kwargs.get('frozen', False):
+					self.W0 = Geval[self.n_obs:,:]
 			elif model.type == 'map':
 				Geval = self.G_ens(U0, model)
 			else:
@@ -364,7 +365,8 @@ class flow(enka):
 
 		if model.type == 'pde':
 			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
-			self.W0 = Geval[self.n_obs:,:]
+			if kwargs.get('frozen', False):
+				self.W0 = Geval[self.n_obs:,:]
 		elif model.type == 'map':
 			Geval = self.G_ens(U0, model)
 
