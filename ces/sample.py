@@ -34,6 +34,8 @@ class MCMC(object):
 
 		if kwargs.get('Gamma', None) is None:
 			Sigma = np.diag(gvars.flatten())
+		elif kwargs.get('noise_compounded', False):
+			Sigma = kwargs.get('Gamma', None) + np.diag(gvars.flatten())
 		else:
 			Sigma = kwargs.get('Gamma', None)
 
@@ -49,6 +51,8 @@ class MCMC(object):
 
 		if kwargs.get('Gamma', None) is None:
 			phi_current += .5 * np.log(gvars).sum()
+		elif kwargs.get('noise_compounded', False):
+			phi_current += .5 * np.log(np.linalg.det(Sigma))
 		samples.append(current)
 		accept = 0.
 
@@ -63,6 +67,8 @@ class MCMC(object):
 
 			if kwargs.get('Gamma', None) is None:
 				Sigma = np.diag(gvars_proposal.flatten())
+			elif kwargs.get('noise_compounded', False):
+				Sigma = kwargs.get('Gamma', None) + np.diag(gvars_proposal.flatten())
 			else:
 				Sigma = kwargs.get('Gamma', None)
 
@@ -77,6 +83,8 @@ class MCMC(object):
 
 			if kwargs.get('Gamma', None) is None:
 				phi_proposal += .5 * np.log(gvars_proposal).sum()
+			elif kwargs.get('noise_compounded', False):
+				phi_proposal += .5 * np.log(np.linalg.det(Sigma))
 
 			if np.random.uniform() < np.exp(phi_current - phi_proposal):
 				current = proposal
