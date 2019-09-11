@@ -37,7 +37,7 @@ def predict_gps(enka, X, mute_bar = True, **kwargs):
 
 	if kwargs.get('separable', False):
 		gpmeans = np.empty(shape = (kwargs.get('model').n_obs,1))
-		gpvars = np.empty(shape =  (kwargs.get('model').n_obs,1))
+		gpvars  = np.empty(shape = (kwargs.get('model').n_obs,1))
 	else:
 		gpmeans = np.empty(shape = (len(gpmodels), len(X)))
 		gpvars  = np.empty(shape = (len(gpmodels), len(X)))
