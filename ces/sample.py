@@ -42,7 +42,10 @@ class MCMC(object):
 
 		if kwargs.get('model', None) is not None:
 			model = kwargs.get('model', None)
-			phi_current -= model.logjacobian(current)
+			try:
+				phi_current -= model.logjacobian(current)
+			except AttributeError:
+				pass
 
 		if kwargs.get('Gamma', None) is None:
 			phi_current += .5 * np.log(gvars).sum()
@@ -67,7 +70,10 @@ class MCMC(object):
 			phi_proposal -= prior.logpdf(proposal)
 
 			if kwargs.get('model', None) is not None:
-				phi_proposal -= model.logjacobian(proposal)
+				try:
+					phi_proposal -= model.logjacobian(proposal)
+				except AttributeError:
+					pass
 
 			if kwargs.get('Gamma', None) is None:
 				phi_proposal += .5 * np.log(gvars_proposal).sum()
