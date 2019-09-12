@@ -29,7 +29,9 @@ class MCMC(object):
 		current = enka.Ustar.mean(axis = 1)
 		y = self.y_obs.reshape(-1,1)
 		samples = []
-		gmean, gvars = emulate.predict_gps(enka, current.reshape(1,-1), kwargs.get('gpmodels', None))
+		gmean, gvars = emulate.predict_gps(enka, current.reshape(1,-1),
+							gpmodels = kwargs.get('gpmodels', None),
+							nugget = kwargs.get('nugget', True))
 		yG           = gmean - y
 
 		if kwargs.get('Gamma', None) is None:
@@ -62,7 +64,9 @@ class MCMC(object):
 			elif kwargs.get('update', None) == 'pCN':
 				proposal = self.pCN(current, scales, enka.p, beta = kwargs.get('beta', 0.5))
 
-			gmean_proposal, gvars_proposal = emulate.predict_gps(enka, proposal.reshape(1,-1), kwargs.get('gpmodels', None))
+			gmean_proposal, gvars_proposal = emulate.predict_gps(enka, proposal.reshape(1,-1),
+						gpmodels = kwargs.get('gpmodels', None),
+						nugget = kwargs.get('nugget', True))
 			yGproposal    = gmean_proposal - y
 
 			if kwargs.get('Gamma', None) is None:

@@ -55,9 +55,15 @@ def predict_gps(enka, X, mute_bar = True, **kwargs):
 				position = 0):
 			try:
 				getattr(enka, 'scaled')
-				mean_pred, var_pred = model.predict_y(np.linalg.solve(enka.scale['cov'], X.T - enka.scale['mean']).T)
+				if kwargs.get('nugget', True):
+					mean_pred, var_pred = model.predict_y(np.linalg.solve(enka.scale['cov'], X.T - enka.scale['mean']).T)
+				else :
+					mean_pred, var_pred = model.predict_f(np.linalg.solve(enka.scale['cov'], X.T - enka.scale['mean']).T)
 			except AttributeError:
-				mean_pred, var_pred = model.predict_y(X)
+				if kwargs.get('nugget', True):
+					mean_pred, var_pred = model.predict_y(X)
+				else:
+					mean_pred, var_pred = model.predict_f(X)
 
 			gpmeans[ii,:] = mean_pred.flatten()
 			gpvars[ii,:] = var_pred.flatten()
