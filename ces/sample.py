@@ -155,7 +155,7 @@ class MCMC(object):
 			except AttributeError:
 				pass
 
-			if np.random.uniform() < np.exp(phi_current - phi_proposal):
+			if np.log(np.random.uniform()) < phi_current - phi_proposal:
 				current     = proposal
 				phi_current = phi_proposal
 				accept += 1.
