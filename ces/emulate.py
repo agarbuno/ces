@@ -23,6 +23,8 @@ def predict_gps(enka, X, mute_bar = True, **kwargs):
 	- X: numpy array with dimensions [n_points, d].
 		- n_points: number of training points.
 		- d: dimensionality of the parameter vector.
+	- For PCA reconstruction only pass one data point at a time. That is,
+		X is an numpy array [1, d].
 	"""
 	try:
 		getattr(enka, 'gpmodels')
@@ -67,6 +69,11 @@ def predict_gps(enka, X, mute_bar = True, **kwargs):
 
 			gpmeans[ii,:] = mean_pred.flatten()
 			gpvars[ii,:] = var_pred.flatten()
+
+		if kwargs.get('pca_tools', None) is not None:
+			pca_tools = kwargs.get('pca_tools')
+			gpmeans   = pca_tools['VD_k'].dot(gpmeans) + pca_tools['mG']
+			gpvars    = pca_tools['VD_k'].dot(np.diag(gpvars.flatten())).dot(pca_tools['VD_k'].T)
 
 	return [gpmeans, gpvars]
 

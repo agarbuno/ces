@@ -31,15 +31,18 @@ class MCMC(object):
 		samples = []
 		gmean, gvars = emulate.predict_gps(enka, current.reshape(1,-1),
 							gpmodels = kwargs.get('gpmodels', None),
-							nugget = kwargs.get('nugget', True))
+							nugget = kwargs.get('nugget', True),
+							pca_tools = kwargs.get('pca_tools', None))
 		yG           = gmean - y
 
 		if kwargs.get('Gamma', None) is None:
 			Sigma = np.diag(gvars.flatten())
-		elif kwargs.get('noise_compounded', False):
-			Sigma = kwargs.get('Gamma', None) + np.diag(gvars.flatten())
+		elif kwargs.get('noise_compounded', False) and kwargs.get('pca_tools', None) is None:
+			Sigma = kwargs.get('Gamma') + np.diag(gvars.flatten())
+		elif kwargs.get('pca_tools', None) is not None:
+			Sigma = kwargs.get('Gamma') + gvars
 		else:
-			Sigma = kwargs.get('Gamma', None)
+			Sigma = kwargs.get('Gamma')
 
 		phi_current  = (yG * np.linalg.solve(2 * Sigma, yG)).sum()
 		phi_current -= prior.logpdf(current)
@@ -54,7 +57,8 @@ class MCMC(object):
 		if kwargs.get('Gamma', None) is None:
 			phi_current += .5 * np.log(gvars).sum()
 		elif kwargs.get('noise_compounded', False):
-			phi_current += .5 * np.log(np.linalg.det(Sigma))
+			phi_current += .5 * np.log(np.linalg.eigvals(Sigma)).sum()
+			# phi_current += .5 * np.log(np.linalg.det(Sigma))
 		samples.append(current)
 		accept = 0.
 
@@ -66,13 +70,16 @@ class MCMC(object):
 
 			gmean_proposal, gvars_proposal = emulate.predict_gps(enka, proposal.reshape(1,-1),
 						gpmodels = kwargs.get('gpmodels', None),
-						nugget = kwargs.get('nugget', True))
+						nugget = kwargs.get('nugget', True),
+						pca_tools = kwargs.get('pca_tools', None))
 			yGproposal    = gmean_proposal - y
 
 			if kwargs.get('Gamma', None) is None:
 				Sigma = np.diag(gvars_proposal.flatten())
-			elif kwargs.get('noise_compounded', False):
+			elif kwargs.get('noise_compounded', False) and kwargs.get('pca_tools', None) is None:
 				Sigma = kwargs.get('Gamma', None) + np.diag(gvars_proposal.flatten())
+			elif kwargs.get('pca_tools', None) is not None:
+				Sigma = kwargs.get('Gamma') + gvars_proposal
 			else:
 				Sigma = kwargs.get('Gamma', None)
 
@@ -88,7 +95,8 @@ class MCMC(object):
 			if kwargs.get('Gamma', None) is None:
 				phi_proposal += .5 * np.log(gvars_proposal).sum()
 			elif kwargs.get('noise_compounded', False):
-				phi_proposal += .5 * np.log(np.linalg.det(Sigma))
+				# phi_proposal += .5 * np.log(np.linalg.det(Sigma))
+				phi_proposal += .5 * np.log(np.linalg.eigvals(Sigma)).sum()
 
 			if np.random.uniform() < np.exp(phi_current - phi_proposal):
 				current = proposal
