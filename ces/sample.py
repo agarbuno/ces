@@ -28,7 +28,16 @@ class MCMC(object):
 
 		current = enka.Ustar.mean(axis = 1)
 		y = self.y_obs.reshape(-1,1)
-		samples = []
+
+		try:
+			getattr(self, 'samples')
+			samples = list(self.samples.T)
+			current = samples[-1]
+		except AttributeError:
+			samples = []
+			samples.append(current.flatten())
+			accept = 0.
+
 		gmean, gvars = emulate.predict_gps(enka, current.reshape(1,-1),
 							gpmodels = kwargs.get('gpmodels', None),
 							nugget = kwargs.get('nugget', True),
@@ -59,8 +68,6 @@ class MCMC(object):
 		elif kwargs.get('noise_compounded', False):
 			phi_current += .5 * np.log(np.linalg.eigvals(Sigma)).sum()
 			# phi_current += .5 * np.log(np.linalg.det(Sigma))
-		samples.append(current)
-		accept = 0.
 
 		for k in tqdm(range(n_mcmc), desc ='MCMC samples: ', disable = self.mute_bar):
 			if kwargs.get('update', None) is None:
@@ -131,9 +138,14 @@ class MCMC(object):
 		except AttributeError:
 			pass
 
-		samples = []
-		samples.append(current.flatten())
-		accept = 0.
+		try:
+			getattr(self, 'samples')
+			samples = list(self.samples.T)
+			current = samples[-1]
+		except AttributeError:
+			samples = []
+			samples.append(current.flatten())
+			accept = 0.
 
 		for kk in tqdm(range(n_mcmc), desc ='MCMC samples: ', disable = self.mute_bar):
 			if kwargs.get('update', None) is None:
