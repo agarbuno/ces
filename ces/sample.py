@@ -39,8 +39,8 @@ class MCMC(object):
 			accept = 0.
 
 		gmean, gvars = emulate.predict_gps(enka, current.reshape(1,-1),
-							gpmodels = kwargs.get('gpmodels', None),
-							nugget = kwargs.get('nugget', True),
+							gpmodels  = kwargs.get('gpmodels', None),
+							nugget    = kwargs.get('nugget', True),
 							pca_tools = kwargs.get('pca_tools', None))
 		yG           = gmean - y
 

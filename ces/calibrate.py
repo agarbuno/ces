@@ -205,14 +205,14 @@ class enka(object):
 		try:
 			getattr(self, 'Uall')
 			if not online:
-				np.save(path+file+'ensemble', self.Ustar)
+				np.save(path+file+'ensemble' , self.Ustar)
 				np.save(path+file+'Gensemble', self.Gstar)
 				pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
 				if all:
-					np.save(path+file+'ensemble_path', self.Uall)
+					np.save(path+file+'ensemble_path' , self.Uall)
 					np.save(path+file+'Gensemble_path', self.Gall)
 			else:
-				np.save(path+file+'ensemble_'+str(counter).zfill(4), self.Uall[-1])
+				np.save(path+file+'ensemble_' +str(counter).zfill(4), self.Uall[-1])
 				np.save(path+file+'Gensemble_'+str(counter).zfill(4), self.Gall[-1])
 				pickle.dump(self.metrics, open(path+file+'metrics.pkl', "wb"))
 		except AttributeError:
@@ -234,14 +234,14 @@ class enka(object):
 				self.Uall = np.load(path + eks_dir + 'ensemble_path.npy')
 				self.Gall = np.load(path + eks_dir + 'Gensemble_path.npy')
 			except FileNotFoundError:
-				print('Path files not found.')
+				print('EKS trajectory files not found.')
 				return False
 		else:
 			try:
 				self.Uall = []
 				self.Gall = []
 				for iter in range(len(self.metrics['v'])):
-					self.Uall.append(np.load(path + eks_dir + 'ensemble_' + str(iter).zfill(4) + '.npy'))
+					self.Uall.append(np.load(path + eks_dir + 'ensemble_'  + str(iter).zfill(4) + '.npy'))
 					self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
 				self.Uall = np.asarray(self.Uall)
 				self.Gall = np.asarray(self.Gall)
@@ -300,7 +300,7 @@ class flow(enka):
 
 			except AttributeError:
 				# Storing the ensemble members
-				self.Uall = []; self.Uall.append(U0)
+				self.Uall = [];
 				self.Gall = [];
 
 		if model.type == 'pde':
@@ -331,6 +331,7 @@ class flow(enka):
 				break # Raise an error
 
 			if trace:
+				self.Uall.append(U0)
 				self.Gall.append(Geval)
 
 			Geval = Geval[:self.n_obs,:]
@@ -371,8 +372,11 @@ class flow(enka):
 			Geval = self.G_ens(U0, model)
 
 		if trace:
-			self.Uall = np.asarray(self.Uall)
-			self.Gall.append(Geval); self.Gall = np.array(self.Gall)
+			self.Uall.append(U0)
+			self.Gall.append(Geval);
+
+			self.Uall = np.asarray(self.Uall);
+			self.Gall = np.array(self.Gall)
 
 		self.Ustar = U0
 		self.Gstar = Geval[:self.n_obs,:]
@@ -472,7 +476,6 @@ class flow(enka):
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
 
-
 		Outputs:
 		- None
 		"""
@@ -533,7 +536,7 @@ class flow(enka):
 
 		self.Uall = np.asarray(self.Uall)
 
-	def eks_update(self, y_obs, U0, Geval, Gamma, iter, trace = True, **kwargs):
+	def eks_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
@@ -563,12 +566,9 @@ class flow(enka):
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
-		if trace:
-			self.Uall.append(Uk)
-
 		return Uk
 
-	def eks_update_jac(self, y_obs, U0, Geval, Gamma, iter, trace = True, **kwargs):
+	def eks_update_jac(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
@@ -605,12 +605,9 @@ class flow(enka):
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
-		if trace:
-			self.Uall.append(Uk)
-
 		return Uk
 
-	def eks_update_jacobian(self, y_obs, U0, Geval, Gamma, iter, trace = True, **kwargs):
+	def eks_update_jacobian(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
@@ -645,12 +642,9 @@ class flow(enka):
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
-		if trace:
-			self.Uall.append(Uk)
-
 		return Uk
 
-	def eks_update_corrected(self, y_obs, U0, Geval, Gamma, iter, trace = True, **kwargs):
+	def eks_update_corrected(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
@@ -680,9 +674,6 @@ class flow(enka):
 			hk * (self.p + 1)/self.J * (U0 - Umean))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
-
-		if trace:
-			self.Uall.append(Uk)
 
 		return Uk
 
