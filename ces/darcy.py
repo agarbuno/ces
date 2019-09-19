@@ -29,9 +29,12 @@ class model(object):
 		else:
 			return np.asarray(U).flatten()[self.obs_index]
 
-	def start(self):
+	def start(self, mpath = None):
 		self.eng = matlab.engine.start_matlab("-nojvm -nosplash")
-		self.eng.addpath(r'./../mfiles','-end');
+		if mpath is None:
+			self.eng.addpath(r'./../mfiles','-end');
+		else:
+			self.eng.addpath(mpath,'-end');
 
 	def stop(self):
 		self.eng.quit()
@@ -46,7 +49,8 @@ class model(object):
 		self.ustar  = np.random.normal(0, 1, int(self.p))
 
 	def set_rank(self):
-		k = np.concatenate((np.arange(6), 100 * np.arange(6, int(self.Nmesh))))
+		# k = np.concatenate((np.arange(6), 100 * np.arange(6, int(self.Nmesh))))
+		k = np.arange(int(self.Nmesh))
 		K1, K2 = np.meshgrid(k, k)
 		self.eigs = (self.tau**(self.alpha-1))*(np.pi**2 * (K1**2 + K2**2) + self.tau**2)**(-self.alpha/2)
 		self.eigs[0,0] = 1e-10
@@ -63,3 +67,40 @@ class model(object):
 
 	def solve_pde(self, theta):
 		return self.eng.solve_gwf(theta)
+
+class model_trunc(model):
+	def __init__(self, alpha = 2., tau  = 3., Nmesh = 2.**4, p = 10):
+		super().__init__(alpha = alpha, tau = tau, Nmesh = Nmesh)
+		super().set_rank()
+		self.p = p
+
+	def __call__(self, xi_red, full_solution = False):
+		"""
+		Inputs:
+			- xi: (p,) array that gets converted to matlab object.
+		Outputs:
+			- y: (n_obs,) array of observations at obs_index.
+		"""
+		xi = np.zeros(int(self.Nmesh * self.Nmesh))
+		xi[self.rank[:self.p]] = np.copy(xi_red)
+
+		theta = self.eval_rf(xi)
+		U     = self.solve_pde(theta)
+		if full_solution:
+			return np.asarray(U).flatten()
+		else:
+			return np.asarray(U).flatten()[self.obs_index]
+
+	def set_initial(self, seed = 1):
+		np.random.seed(seed)
+		ustar  = np.random.normal(0, 1, int(self.Nmesh * self.Nmesh))
+		self.ustar = ustar[self.rank[:self.p]]
+
+	def eval_rf(self, xi):
+		"""
+		Input  :
+			- xi: random seed in the Karhunen Loeve.
+		Outputs:
+			- theta: log Gaussian random field.
+		"""
+		return self.eng.gaussrnd_coarse(matlab.double(xi.reshape(int(self.Nmesh), -1).tolist()), self.alpha, self.tau, self.Nmesh)
