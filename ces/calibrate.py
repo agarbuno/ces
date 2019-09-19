@@ -320,7 +320,7 @@ class flow(enka):
 			self.metrics['r'] = []			# Tracks the collapse towards the truth
 			self.metrics['t'] = []
 
-		for i in tqdm(range(self.T), desc = 'EKS iterations: ', position = 1):
+		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
 			if model.type == 'pde':
 				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
 				if kwargs.get('update_wt', True):
@@ -343,7 +343,7 @@ class flow(enka):
 			elif self.__update == 'eks-jac':
 				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
 			elif self.__update == 'eks-jacobian':
-				U0 = self.eks_update_jacobian(y_obs, U0, Geval, Gamma, i)
+				U0 = self.eks_update_jacobian(y_obs, U0, Geval, Gamma, i, **kwargs)
 
 			if save_online:
 				try:
@@ -624,7 +624,11 @@ class flow(enka):
 		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 		self.radspec.append(np.linalg.eigvals(D).real.max())
 
-		hk = 1./self.radspec[-1]
+		if kwargs.get('adaptive', None) is None:
+			hk = 1./self.radspec[-1]
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
@@ -647,6 +651,7 @@ class flow(enka):
 	def eks_update_corrected(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
+		Reich correction
 		"""
 
 		# For ensemble update
