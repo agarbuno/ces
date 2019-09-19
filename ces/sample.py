@@ -33,6 +33,7 @@ class MCMC(object):
 			getattr(self, 'samples')
 			samples = list(self.samples.T)
 			current = samples[-1]
+			accept  = 0
 		except AttributeError:
 			samples = []
 			samples.append(current.flatten())
