@@ -88,26 +88,6 @@ class enka(object):
 		"""
 		pass
 
-	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
-		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF. Data averages are provided as a stream.
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- data: A numpy array of shape (n_obs, n_samps) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-
-		Outputs:
-		- None
-		"""
-		pass
-
 	def eks_update(self, Geval):
 		"""
 		Perform a single step update of the EKS algorithm.
@@ -306,7 +286,14 @@ class flow(enka):
 		if model.type == 'pde':
 			wt = kwargs.get('wt', None)
 			t  = kwargs.get('t', None)
-			self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
+			if kwargs.get('ws', None) is not None:
+				widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
+				self.W0 = kwargs.get('ws')[widx].T
+
+				self.Wall = [];
+				self.Wall.append(widx)
+			else:
+				self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
 		try :
 			getattr(self, 'metrics')
@@ -324,7 +311,12 @@ class flow(enka):
 			if model.type == 'pde':
 				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
 				if kwargs.get('update_wt', True):
-					self.W0 = Geval[self.n_obs:,:]
+					if kwargs.get('ws', None) is not None:
+						widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
+						self.Wall.append(widx)
+						self.W0 = kwargs.get('ws')[widx].T
+					else:
+						self.W0 = Geval[self.n_obs:,:]
 			elif model.type == 'map':
 				Geval = self.G_ens(U0, model)
 			else:
@@ -367,7 +359,10 @@ class flow(enka):
 		if model.type == 'pde':
 			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
 			if kwargs.get('update_wt', True):
-				self.W0 = Geval[self.n_obs:,:]
+				if kwargs.get('ws', None) is not None:
+					self.W0 = kwargs.get('ws')[np.random.randint(kwargs.get('ws').shape[0], size = self.J)].T
+				else:
+					self.W0 = Geval[self.n_obs:,:]
 		elif model.type == 'map':
 			Geval = self.G_ens(U0, model)
 
@@ -450,80 +445,6 @@ class flow(enka):
 			Umean = U0.mean(axis = 1)[:, np.newaxis]
 			# Uk = U0 - hk * np.matmul(U0 - Umean, D + S)
 			Uk = U0 - hk * np.matmul(U0 - Umean, D) - np.sqrt(2 * hk) * np.matmul(U0 - Umean, S)
-			# Uk[Uk<0.] = 0.
-			# Implicit
-			# Uk = np.linalg.solve(np.eye(J) + hk * D.T, U0.T).T
-			# Uk = np.linalg.solve(np.eye(J) + hk * D.T, (U0 - U0.mean(axis = 1)[:, np.newaxis]).T).T + U0.mean(axis = 1)[:, np.newaxis]
-			# Uk = np.linalg.solve(np.eye(J) + (hk/2) * D.T, np.matmul(np.eye(J) - (hk/2) * D.T, U0.T)).T
-			# Uk = U0 - (hk / (1 + hk * np.diag(D))) * np.matmul(U0, D)
-
-			self.Uall.append(Uk)
-			U0 = Uk
-
-		self.Uall = np.asarray(self.Uall)
-
-	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
-		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- data: A numpy array of shape (n_obs, n_samps) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-		Outputs:
-		- None
-		"""
-		self.W0 = np.tile(wt, self.J).reshape(self.J, 3).T
-
-		# Storing the ensemble members
-		self.Uall = []; self.Uall.append(U0)
-		self.radspec = []
-
-		# Storing metrics
-		self.metrics = dict()
-		self.metrics['v'] = []			# Tracks collapse in parameter space
-		self.metrics['V'] = []			# Tracks collapse after forward model evaln
-		self.metrics['R'] = []			# Tracks data-fitting
-		self.metrics['r'] = []
-		self.t = []
-
-		for i in tqdm(range(self.T)):
-			Geval = self.G_ens(np.vstack([U0, self.W0]), model, t)
-			self.W0 = Geval[self.n_obs:,:]
-			Geval = Geval[:self.n_obs,:]
-
-			# For ensemble update
-			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-			R = Geval - y_obs[:,np.newaxis]
-			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-			S = -(1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, \
-					y_obs[:,np.newaxis] - data[:,np.random.randint(data.shape[1])][:,np.newaxis]
-					)
-				)
-
-			 # For tracking metrics
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-
-			self.radspec.append(np.linalg.eigvals(D + S).real.max())
-			hk = 1./self.radspec[-1]
-			if i == 0:
-				self.t.append(hk)
-			else:
-				self.t.append(hk + self.t[-1])
-			# Explicit
-			# Uk = U0 - hk * np.matmul(U0, D)
-			Umean = U0.mean(axis = 1)[:, np.newaxis]
-			# Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D + S))
-			Uk = np.abs(U0 - hk * np.matmul(U0 - Umean, D + S))
 			# Uk[Uk<0.] = 0.
 			# Implicit
 			# Uk = np.linalg.solve(np.eye(J) + hk * D.T, U0.T).T
