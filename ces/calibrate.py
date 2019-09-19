@@ -482,8 +482,8 @@ class flow(enka):
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
-			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)))
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
@@ -520,8 +520,8 @@ class flow(enka):
 		else :
 			grad_logjacobian = 0.0 * U0
 
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
-			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)) + \
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
 			hk * np.matmul(Ucov, grad_logjacobian))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
@@ -561,8 +561,8 @@ class flow(enka):
 		Jacobian[2] = -np.exp(-U0[2])
 		# ----------------------------------------------------------------------
 
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
-			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)) + \
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
 			hk * np.matmul(Ucov, Jacobian))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
@@ -595,8 +595,8 @@ class flow(enka):
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma, Ucov),
-			U0 - hk * np.matmul(U0 - Umean, D) + hk * np.linalg.solve(self.sigma, np.matmul(Ucov, self.mu)) + \
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
 			hk * (self.p + 1)/self.J * (U0 - Umean))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
