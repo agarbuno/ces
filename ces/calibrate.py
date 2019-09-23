@@ -341,15 +341,15 @@ class flow(enka):
 				try:
 					getattr(self, 'nexp')
 					self.save(path = self.directory+'/ensembles/',
-							  file = model.model_name + '_' + \
-							  			str(model.l_window).zfill(3)+ '_' + \
-										str(self.J).zfill(4)+ '_' + \
+							  file = model.model_name + '-eks-' + \
+							  			str(model.l_window).zfill(3)+ '-' + \
+										str(self.J).zfill(4)+ '-' + \
 										str(self.nexp).zfill(2) + '/',
 							  online = True, counter = i)
 				except AttributeError:
 					self.save(path = self.directory+'/ensembles/',
-							  file = model.model_name + '_' + \
-							  			str(model.l_window).zfill(3)+ '_' + \
+							  file = model.model_name + '-eks-' + \
+							  			str(model.l_window).zfill(3)+ '-' + \
 										str(self.J).zfill(4) + '/',
 							  online = True, counter = i)
 
@@ -379,10 +379,10 @@ class flow(enka):
 		try:
 			getattr(self, 'nexp')
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
-					'_' + str(self.J).zfill(4)+ '_' + str(self.nexp).zfill(2)+'/'
+					'-eks-' + str(self.J).zfill(4)+ '-' + str(self.nexp).zfill(2)+'/'
 		except AttributeError:
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
-					'_' + str(self.J).zfill(4)+ '/'
+					'-eks-' + str(self.J).zfill(4)+ '/'
 
 	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, save_online = False):
 		"""
@@ -607,204 +607,259 @@ class flow(enka):
 
 class iterative(enka):
 
-	def run_pde(self, y_obs, U0, wt, t, model, Gamma, Jnoise):
+	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
-		Find the minimizer of an inverse problem using the iterative EnKF
+		Find the minimizer of an inverse problem using the continuous time limit
+		of the EKnF. The update can selected from a range of options.
 
 		Inputs:
 		- U0: A numpy array of shape (p, J) initial ensemble; there are J
 			ensemble particles each of dimension p.
 		- y_obs: A numpy array of shape (n_obs,) of observed data.
+		- model: Forward model to be used. Currently for two types of problems.
+			- 'pde' : pde / ode constrained forward models.
+			- 'map' : input output functions.
+		- Gamma: Noise covariance structure. Shape has to be (n_obs, n_obs)
+		- Jnoise: Precomputed cholesky decomposition of Gamma.
+
+		Optional (pde model type only):
 		- wt: A numpy array of initial conditions to start the ensemble when
 			evaluating the forward model
 		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
 
 		Outputs:
 		- None
 		"""
-		self.W0 = np.tile(wt, self.J).reshape(self.J, 3).T
+		try:
+			getattr(model, 'type')
+		except AttributeError:
+			raise
 
-		# Storing the ensemble members
-		self.Uall = []; self.Uall.append(U0)
-		self.radspec = []
+		try:
+			getattr(self, 'directory')
+		except AttributeError:
+			self.directory = os.getcwd()
 
-		# Storing metrics
-		self.metrics = dict()
-		self.metrics['v'] = [] 			# Tracks collapse in parameter space
-		self.metrics['V'] = []			# Tracks collapse after forward model evaln
-		self.metrics['R'] = []			# Tracks data-fitting
-		self.metrics['r'] = [] 			# Tracks the collapse towards the truth
-		self.t = []
+		self.__update = kwargs.get('update', 'eks')
 
-		for i in tqdm(range(self.T)):
+		if trace:
+			try:
+				getattr(self, 'Uall')
+				self.Uall = list(self.Uall)
+				self.Gall = list(self.Gall)
 
-			Geval = self.G_ens(np.vstack([U0, self.W0]), model, t)
-			self.W0 = Geval[self.n_obs:,:]
+			except AttributeError:
+				# Storing the ensemble members
+				self.Uall = [];
+				self.Gall = [];
+
+		if model.type == 'pde':
+			wt = kwargs.get('wt', None)
+			t  = kwargs.get('t', None)
+			if kwargs.get('ws', None) is not None:
+				widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
+				self.W0 = kwargs.get('ws')[widx].T
+
+				self.Wall = [];
+				self.Wall.append(widx)
+			else:
+				self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
+
+		try :
+			getattr(self, 'metrics')
+		except AttributeError:
+			# Storing metrics
+			self.radspec = []
+			self.metrics = dict()
+			self.metrics['v'] = []			# Tracks collapse in parameter space
+			self.metrics['V'] = []			# Tracks collapse after forward model evaln
+			self.metrics['R'] = []			# Tracks data-fitting
+			self.metrics['r'] = []			# Tracks the collapse towards the truth
+			self.metrics['t'] = []
+
+		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
+			if model.type == 'pde':
+				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+				if kwargs.get('update_wt', True):
+					if kwargs.get('ws', None) is not None:
+						widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
+						self.Wall.append(widx)
+						self.W0 = kwargs.get('ws')[widx].T
+					else:
+						self.W0 = Geval[self.n_obs:,:]
+			elif model.type == 'map':
+				Geval = self.G_ens(U0, model)
+			else:
+				break # Raise an error
+
+			if trace:
+				self.Uall.append(U0)
+				self.Gall.append(Geval)
+
 			Geval = Geval[:self.n_obs,:]
 
+			if   self.__update == 'eks':
+				U0 = self.eki_update(y_obs, U0, Geval, Gamma, i)
+			elif self.__update == 'eki-corrected':
+				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, i)
+			elif self.__update == 'eki-jac':
+				U0 = self.eki_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
+			elif self.__update == 'eki-jacobian':
+				U0 = self.eki_update_jacobian(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 
-			# Here starts the ensemble update ----------------------------------
-			# For ensemble update
-			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-			R = U0 - U0.mean(axis = 1)[:,np.newaxis]
+			if save_online:
+				try:
+					getattr(self, 'nexp')
+					self.save(path = self.directory+'/ensembles/',
+							  file = model.model_name + '-eki-' + \
+										str(model.l_window).zfill(3)+ '-' + \
+										str(self.J).zfill(4)+ '-' + \
+										str(self.nexp).zfill(2) + '/',
+							  online = True, counter = i)
+				except AttributeError:
+					self.save(path = self.directory+'/ensembles/',
+							  file = model.model_name + '-eki-' + \
+										str(model.l_window).zfill(3)+ '-' + \
+										str(self.J).zfill(4) + '/',
+							  online = True, counter = i)
 
-			Cpp = (1./self.J) * np.matmul(E, E.T)
-			Cup = (1./self.J) * np.matmul(R, E.T)
-
-			dU = np.matmul(Cup, np.linalg.solve( (1./self.T) * Cpp + Gamma, y_obs[:,np.newaxis] + \
-				np.matmul(Jnoise, (np.random.normal(0, 1, [self.n_obs, self.J]))) - Geval))
-			Uk = np.abs(U0 + (1./self.T) * dU)
-
-			# For tracking metrics
-			R = Geval - y_obs[:,np.newaxis]
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-			if i == 0:
-				self.t.append(1./self.T)
-			else:
-				self.t.append(1./self.T + self.t[-1])
-
-
-			self.Uall.append(Uk)
-			U0 = Uk
-			# Here ends the ensemble update ------------------------------------
-
-		self.Uall = np.asarray(self.Uall)
-		self.Ustar = self.Uall[-1]
-		self.Gstar = self.G_ens(self.Ustar, model)
-
-	def run_nopar(self, y_obs, U0, model, Gamma, Jnoise):
-		"""
-		Find the minimizer of an inverse problem using the iterative EnKF
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-
-		Outputs:
-		- None
-		"""
-
-		# Storing the ensemble members
-		self.Uall = []; self.Uall.append(U0)
-		self.radspec = []
-
-		# Storing metrics
-		self.metrics = dict()
-		self.metrics['v'] = [] 			# Tracks collapse in parameter space
-		self.metrics['V'] = []			# Tracks collapse after forward model evaln
-		self.metrics['R'] = []			# Tracks data-fitting
-		self.metrics['r'] = [] 			# Tracks the collapse towards the truth
-		self.t = []
-
-		for i in tqdm(range(self.T)):
+		if model.type == 'pde':
+			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+			if kwargs.get('update_wt', True):
+				if kwargs.get('ws', None) is not None:
+					self.W0 = kwargs.get('ws')[np.random.randint(kwargs.get('ws').shape[0], size = self.J)].T
+				else:
+					self.W0 = Geval[self.n_obs:,:]
+		elif model.type == 'map':
 			Geval = self.G_ens(U0, model)
 
-			# For ensemble update
-			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-			R = U0 - U0.mean(axis = 1)[:,np.newaxis]
+		if trace:
+			self.Uall.append(U0)
+			self.Gall.append(Geval);
 
-			Cpp = (1./self.J) * np.matmul(E, E.T)
-			Cup = (1./self.J) * np.matmul(R, E.T)
+			self.Uall = np.asarray(self.Uall);
+			self.Gall = np.array(self.Gall)
 
-			dU = np.matmul(Cup, np.linalg.solve( (1./self.T) * Cpp + Gamma, y_obs[:,np.newaxis] + \
-				np.matmul(Jnoise, (np.random.normal(0, 1, [self.n_obs, self.J]))) - Geval))
-			Uk = U0 + (1./self.T) * dU
+		self.Ustar = U0
+		self.Gstar = Geval[:self.n_obs,:]
 
-			# dU = np.matmul(Cup, np.linalg.solve(Cpp + Gamma, y_obs[:,np.newaxis] + \
-			# 	np.matmul(Jnoise, (np.random.normal(0, 1, [self.n_obs, self.J]))) - Geval))
-			# Uk = U0 + dU
+		try:
+			getattr(self, 'nexp')
+			self.online_path = self.directory+'/ensembles/'+model.model_name + \
+					'-eki-' + str(self.J).zfill(4)+ '-' + str(self.nexp).zfill(2)+'/'
+		except AttributeError:
+			self.online_path = self.directory+'/ensembles/'+model.model_name + \
+					'-eki-' + str(self.J).zfill(4)+ '/'
 
-			# tracking metrics
-			R = Geval - y_obs[:,np.newaxis]
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-			if i == 0:
-				self.t.append(1./self.T)
-			else:
-				self.t.append(1./self.T + self.t[-1])
 
-			self.Uall.append(Uk)
-			U0 = Uk
-
-		self.Uall = np.asarray(self.Uall)
-		self.Ustar = self.Uall[-1]
-		self.Gstar = self.G_ens(self.Ustar, model)
-
-	def run_data(self, y_obs, data, U0, wt, t, model, Gamma, Jnoise):
+	def eki_update(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
-		Find the minimizer of an inverse problem using the iterative EnKF
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-
-		Outputs:
-		- None
+		Ensemble update based on the continuous time limit of the EKS.
 		"""
-		self.W0 = np.tile(wt, self.J).reshape(self.J, 3).T
 
-		# Storing the ensemble members
-		self.Uall = []; self.Uall.append(U0)
-		self.radspec = []
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
-		# Storing metrics
-		self.metrics = dict()
-		self.metrics['v'] = [] 			# Tracks collapse in parameter space
-		self.metrics['V'] = []			# Tracks collapse after forward model evaln
-		self.metrics['R'] = []			# Tracks data-fitting
-		self.metrics['r'] = [] 			# Tracks the collapse towards the truth
-		self.t = []
+		# Track metrics
+		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.radspec.append(np.linalg.eigvals(D).real.max())
 
-		for i in tqdm(range(self.T)):
+		hk = 1./self.radspec[-1]
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
-			Geval = self.G_ens(np.vstack([U0, self.W0]), model, t)
-			self.W0 = Geval[self.n_obs:,:]
-			Geval = Geval[:self.n_obs,:]
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)))
+		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+			np.random.normal(0, 1, [self.p, self.J])))
 
-			# For ensemble update
-			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-			R = U0 - U0.mean(axis = 1)[:,np.newaxis]
+		return Uk
 
-			Cpp = (1./self.J) * np.matmul(E, E.T)
-			Cup = (1./self.J) * np.matmul(R, E.T)
+	def eki_update_jac(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		"""
+		model = kwargs.get('model', None)
 
-			dU = np.matmul(Cup, np.linalg.solve( (1./self.T) * Cpp + Gamma, y_obs[:,np.newaxis] + \
-				y_obs[:,np.newaxis] - data[:,np.random.randint(data.shape[1])][:,np.newaxis] - Geval))
-			Uk = np.abs(U0 + (1./self.T) * dU)
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
-			# For tracking metrics
-			R = Geval - y_obs[:,np.newaxis]
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-			if i == 0:
-				self.t.append(1./self.T)
-			else:
-				self.t.append(1./self.T + self.t[-1])
+		# Track metrics
+		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.radspec.append(np.linalg.eigvals(D).real.max())
 
-			self.Uall.append(Uk)
-			U0 = Uk
+		hk = 1./self.radspec[-1]
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
-		self.Uall = np.asarray(self.Uall)
+		if model is not None:
+			grad_logjacobian = model.grad_logjacobian(U0)
+		else :
+			grad_logjacobian = 0.0 * U0
+
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
+			hk * np.matmul(Ucov, grad_logjacobian))
+		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+			np.random.normal(0, 1, [self.p, self.J])))
+
+		return Uk
+
+	def eki_update_jacobian(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		"""
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = U0 - U0.mean(axis = 1)[:,np.newaxis]
+
+		Cpp = (1./self.J) * np.matmul(E, E.T)
+		Cup = (1./self.J) * np.matmul(R, E.T)
+
+		# Track metrics
+		# self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		# self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+
+		if kwargs.get('adaptive', None) is None:
+			hk = 1.
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./self.T
+
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+
+		# This is a temporal solution is very hardcoded! -----------------------
+		# Jacobian = 0.0 * U0
+		# Jacobian[2] = -np.exp(-U0[2])
+		# ----------------------------------------------------------------------
+
+		dU = np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, y_obs[:,np.newaxis] + \
+			np.matmul( np.sqrt(self.T) * Jnoise, (np.random.normal(0, 1, [self.n_obs, self.J]))) - Geval))
+		Uk = U0 + hk * dU
+		# hk * np.matmul(Ucov, Jacobian))
+
+		return Uk
 
 # ------------------------------------------------------------------------------
