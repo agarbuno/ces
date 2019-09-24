@@ -686,7 +686,7 @@ class inversion(enka):
 						self.Wall.append(widx)
 						self.W0 = kwargs.get('ws')[widx].T
 					else:
-						self.W0 = Geval[self.n_obs:,:]
+						self.W0 = np.copy(Geval[self.n_obs:,:])
 			elif model.type == 'map':
 				Geval = self.G_ens(U0, model)
 			else:
@@ -699,9 +699,9 @@ class inversion(enka):
 			Geval = Geval[:self.n_obs,:]
 
 			if   self.__update == 'eki':
-				U0 = self.eki_update(y_obs, U0, Geval, Gamma, Jnoise, i)
+				U0 = self.eki_update(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 			elif self.__update == 'eki-corrected':
-				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, i)
+				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, i, **kwargs)
 			# elif self.__update == 'eki-jac':
 				# U0 = self.eki_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
 			elif self.__update == 'eki-jacobian':
@@ -762,6 +762,7 @@ class inversion(enka):
 			hk = 1./self.T
 
 		# For ensemble update
+		eta   = np.random.normal(0, 1, [self.n_obs, self.J])
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -783,11 +784,9 @@ class inversion(enka):
 		else:
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
 
-		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-
 		dU = - hk * np.matmul(U0 - Umean, D)
 		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma,
-				np.matmul( Jnoise, np.random.normal(0, 1, [self.n_obs, self.J]))
+				np.matmul(Jnoise, eta)
 				)
 			)
 
@@ -839,8 +838,9 @@ class inversion(enka):
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
 		# For ensemble update
-		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-		R = U0 - U0.mean(axis = 1)[:,np.newaxis]
+		eta = np.random.normal(0, 1, [self.n_obs, self.J])
+		E   = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R   = U0 - U0.mean(axis = 1)[:,np.newaxis]
 
 		Cpp = (1./self.J) * np.matmul(E, E.T)
 		Cup = (1./self.J) * np.matmul(R, E.T)
@@ -866,9 +866,13 @@ class inversion(enka):
 		# Jacobian[2] = -np.exp(-U0[2])
 		# ----------------------------------------------------------------------
 
-		dU = - np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, y_obs[:,np.newaxis] + \
-			np.matmul( np.sqrt(self.T) * Jnoise, (np.random.normal(0, 1, [self.n_obs, self.J]))) - Geval))
-		Uk = U0 - hk * dU
+		# dU = - np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, y_obs[:,np.newaxis] + \
+		# 	np.matmul(np.sqrt(self.T) * Jnoise, eta) - Geval))
+		# Uk = U0 - hk * dU
+
+		dU = hk * np.matmul(Cup, np.linalg.solve(hk * Cpp + Gamma, y_obs[:,np.newaxis] - Geval))
+		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, np.matmul(Jnoise, eta)))
+		Uk = U0 + dU + dW
 		# hk * np.matmul(Ucov, Jacobian))
 
 		return Uk
