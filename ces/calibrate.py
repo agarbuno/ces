@@ -198,7 +198,7 @@ class enka(object):
 		except AttributeError:
 			tqdm.write('There is nothing to save')
 
-	def load(self, path = './', eks_dir = 'ces/', ix_ensemble = False):
+	def load(self, path = './', eks_dir = 'ces/', ix_ensemble = False, flag_metrics = False):
 		"""
 		Load files and rebuild an eka object.
 		"""
@@ -220,9 +220,14 @@ class enka(object):
 			try:
 				self.Uall = []
 				self.Gall = []
-				for iter in range(len(self.metrics['v'])):
-					self.Uall.append(np.load(path + eks_dir + 'ensemble_'  + str(iter).zfill(4) + '.npy'))
-					self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
+				if flag_metrics:
+					for iter in range(len(self.metrics['v'])):
+						self.Uall.append(np.load(path + eks_dir + 'ensemble_'  + str(iter).zfill(4) + '.npy'))
+						self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
+				else:
+					for iter in range(np.sum([file.split('_')[0] == 'ensemble' for file in (os.listdir(directory + eks_dir))])):
+						self.Uall.append(np.load(path + eks_dir + 'ensemble_'  + str(iter).zfill(4) + '.npy'))
+						self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
 				self.Uall = np.asarray(self.Uall)
 				self.Gall = np.asarray(self.Gall)
 				self.Ustar = self.Uall[-1]
