@@ -706,7 +706,7 @@ class inversion(enka):
 			if   self.__update == 'eki':
 				U0 = self.eki_update(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 			elif self.__update == 'eki-corrected':
-				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 			# elif self.__update == 'eki-jac':
 				# U0 = self.eki_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
 			elif self.__update == 'eki-jacobian':
@@ -840,7 +840,7 @@ class inversion(enka):
 
 	def eki_update_jacobian(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
-		Ensemble update based on the continuous time limit of the EKS.
+		Ensemble update based on the continuous time limit of the EKI.
 		"""
 		# For ensemble update
 		eta = np.random.normal(0, 1, [self.n_obs, self.J])
