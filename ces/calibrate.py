@@ -235,7 +235,7 @@ class enka(object):
 
 # ------------------------------------------------------------------------------
 
-class flow(enka):
+class sampling(enka):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
@@ -316,7 +316,7 @@ class flow(enka):
 						self.Wall.append(widx)
 						self.W0 = kwargs.get('ws')[widx].T
 					else:
-						self.W0 = Geval[self.n_obs:,:]
+						self.W0 = np.copy(Geval[self.n_obs:,:])
 			elif model.type == 'map':
 				Geval = self.G_ens(U0, model)
 			else:
@@ -605,7 +605,7 @@ class flow(enka):
 
 # ------------------------------------------------------------------------------
 
-class iterative(enka):
+class inversion(enka):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
@@ -640,7 +640,7 @@ class iterative(enka):
 		except AttributeError:
 			self.directory = os.getcwd()
 
-		self.__update = kwargs.get('update', 'eks')
+		self.__update = kwargs.get('update', 'eki')
 
 		if trace:
 			try:
@@ -698,12 +698,12 @@ class iterative(enka):
 
 			Geval = Geval[:self.n_obs,:]
 
-			if   self.__update == 'eks':
-				U0 = self.eki_update(y_obs, U0, Geval, Gamma, i)
+			if   self.__update == 'eki':
+				U0 = self.eki_update(y_obs, U0, Geval, Gamma, Jnoise, i)
 			elif self.__update == 'eki-corrected':
 				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, i)
-			elif self.__update == 'eki-jac':
-				U0 = self.eki_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
+			# elif self.__update == 'eki-jac':
+				# U0 = self.eki_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
 			elif self.__update == 'eki-jacobian':
 				U0 = self.eki_update_jacobian(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 
@@ -756,31 +756,42 @@ class iterative(enka):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
+		if kwargs.get('adaptive', None) is None:
+			hk = 1.
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./self.T
 
 		# For ensemble update
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
 		R = Geval - y_obs[:,np.newaxis]
-		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+
+		Cpp = (1./self.J) * np.matmul(E, E.T)
+		Cup = (1./self.J) * np.matmul(U0 - Umean, E.T)
+
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma + hk * Cpp, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-		self.radspec.append(np.linalg.eigvals(D).real.max())
-
-		hk = 1./self.radspec[-1]
+		# self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		# self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		# self.radspec.append(np.linalg.eigvals(D).real.max())
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
-		Umean = U0.mean(axis = 1)[:, np.newaxis]
+
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)))
-		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-			np.random.normal(0, 1, [self.p, self.J])))
+		dU = - hk * np.matmul(U0 - Umean, D)
+		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma,
+				np.matmul( Jnoise, np.random.normal(0, 1, [self.n_obs, self.J]))
+				)
+			)
+
+		Uk = U0 + dU + dW
 
 		return Uk
 
@@ -821,7 +832,7 @@ class iterative(enka):
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
-		return Uk
+		return np.zeros_like(U0)
 
 	def eki_update_jacobian(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
@@ -855,9 +866,9 @@ class iterative(enka):
 		# Jacobian[2] = -np.exp(-U0[2])
 		# ----------------------------------------------------------------------
 
-		dU = np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, y_obs[:,np.newaxis] + \
+		dU = - np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, y_obs[:,np.newaxis] + \
 			np.matmul( np.sqrt(self.T) * Jnoise, (np.random.normal(0, 1, [self.n_obs, self.J]))) - Geval))
-		Uk = U0 + hk * dU
+		Uk = U0 - hk * dU
 		# hk * np.matmul(Ucov, Jacobian))
 
 		return Uk
