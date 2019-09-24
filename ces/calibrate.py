@@ -225,7 +225,7 @@ class enka(object):
 						self.Uall.append(np.load(path + eks_dir + 'ensemble_'  + str(iter).zfill(4) + '.npy'))
 						self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
 				else:
-					for iter in range(np.sum([file.split('_')[0] == 'ensemble' for file in (os.listdir(directory + eks_dir))])):
+					for iter in range(np.sum([file.split('_')[0] == 'ensemble' for file in (os.listdir(path + eks_dir))])):
 						self.Uall.append(np.load(path + eks_dir + 'ensemble_'  + str(iter).zfill(4) + '.npy'))
 						self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
 				self.Uall = np.asarray(self.Uall)
