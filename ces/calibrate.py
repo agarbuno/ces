@@ -389,79 +389,6 @@ class sampling(enka):
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
 					'-eks-' + str(self.J).zfill(4)+ '/'
 
-	def run_sde(self, y_obs, U0, model, Gamma, Jnoise, save_online = False):
-		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-
-		Outputs:
-		- None
-		"""
-
-		# Storing the ensemble members
-		self.Uall = []; self.Uall.append(U0)
-		self.radspec = []
-
-		# Storing metrics
-		self.metrics = dict()
-		self.metrics['v'] = [] 			# Tracks collapse in parameter space
-		self.metrics['V'] = []			# Tracks collapse after forward model evaln
-		self.metrics['R'] = []			# Tracks data-fitting
-		self.metrics['r'] = [] 			# Tracks the collapse towards the truth
-		self.t = []                 # Tracks simulated time
-
-		for i in tqdm(range(self.T)):
-			Geval = self.G_ens(U0, model)
-
-			# For ensemble update
-			E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-			R = Geval - y_obs[:,np.newaxis]
-			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-			S = -(1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, \
-					np.matmul(Jnoise, (np.random.normal(0,1,[self.n_obs, self.J])))
-					)
-				)
-
-			# For tracking metrics
-			self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-			self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-			self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-			self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			# hk = 1./(np.linalg.norm(D + S) + 1e-8)
-			hk = 1./self.radspec[-1]
-			if i == 0:
-				self.t.append(hk)
-			else:
-				self.t.append(hk + self.t[-1])
-			# Explicit
-			# Uk = U0 - hk * np.matmul(U0, D)
-			Umean = U0.mean(axis = 1)[:, np.newaxis]
-			# Uk = U0 - hk * np.matmul(U0 - Umean, D + S)
-			Uk = U0 - hk * np.matmul(U0 - Umean, D) - np.sqrt(2 * hk) * np.matmul(U0 - Umean, S)
-			# Uk[Uk<0.] = 0.
-			# Implicit
-			# Uk = np.linalg.solve(np.eye(J) + hk * D.T, U0.T).T
-			# Uk = np.linalg.solve(np.eye(J) + hk * D.T, (U0 - U0.mean(axis = 1)[:, np.newaxis]).T).T + U0.mean(axis = 1)[:, np.newaxis]
-			# Uk = np.linalg.solve(np.eye(J) + (hk/2) * D.T, np.matmul(np.eye(J) - (hk/2) * D.T, U0.T)).T
-			# Uk = U0 - (hk / (1 + hk * np.diag(D))) * np.matmul(U0, D)
-
-			self.Uall.append(Uk)
-			U0 = Uk
-
-		self.Uall = np.asarray(self.Uall)
-
 	def eks_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
@@ -707,8 +634,8 @@ class inversion(enka):
 				U0 = self.eki_update(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 			elif self.__update == 'eki-corrected':
 				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
-			# elif self.__update == 'eki-jac':
-				# U0 = self.eki_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
+			elif self.__update == 'eki-flow':
+				U0 = self.eki_update_flow(y_obs, U0, Geval, Gamma, Jnoise, i, model = model)
 			elif self.__update == 'eki-jacobian':
 				U0 = self.eki_update_jacobian(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 
@@ -791,6 +718,46 @@ class inversion(enka):
 
 		dU = - hk * np.matmul(U0 - Umean, D)
 		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma,
+				np.matmul(Jnoise, eta)
+				)
+			)
+
+		Uk = U0 + dU + dW
+
+		return Uk
+
+	def eki_update_flow(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		"""
+		# For ensemble update
+		eta   = np.random.normal(0, 1, [self.n_obs, self.J])
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+
+		Cpp = (1./self.J) * np.matmul(E, E.T)
+		Cup = (1./self.J) * np.matmul(U0 - Umean, E.T)
+
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+		self.radspec.append(np.linalg.eigvals(D).real.max())
+
+		hk = 1./self.radspec[-1]
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+
+		# Track metrics
+		# self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		# self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		# self.radspec.append(np.linalg.eigvals(D).real.max())
+
+		dU = - hk * np.matmul(U0 - Umean, D)
+		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve(Gamma,
 				np.matmul(Jnoise, eta)
 				)
 			)
