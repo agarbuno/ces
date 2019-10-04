@@ -746,7 +746,7 @@ class inversion(enka):
 
 	def eki_update(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
-		Ensemble update based on the continuous time limit of the EKS.
+		Ensemble update based on the continuous time limit of the EKI.
 		"""
 		if kwargs.get('adaptive', None) is None:
 			hk = 1.
@@ -788,7 +788,7 @@ class inversion(enka):
 
 	def eki_update_flow(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
-		Ensemble update based on the continuous time limit of the EKS.
+		Ensemble update based on the continuous time limit of the EKI.
 		"""
 		# For ensemble update
 		eta   = np.random.normal(0, 1, [self.n_obs, self.J])
@@ -829,6 +829,8 @@ class inversion(enka):
 	def eki_update_jac(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
+		Don't use for inversion! PLEASE!!! :8-) 
+		Still to implement grad logjacobian for EKI
 		"""
 		model = kwargs.get('model', None)
 
@@ -868,6 +870,7 @@ class inversion(enka):
 	def eki_update_jacobian(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKI.
+		Still to implement grad logjacobian for EKI
 		"""
 		# For ensemble update
 		eta = np.random.normal(0, 1, [self.n_obs, self.J])
