@@ -341,6 +341,8 @@ class sampling(enka):
 				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
 			elif self.__update == 'eks-jacobian':
 				U0 = self.eks_update_jacobian(y_obs, U0, Geval, Gamma, i, **kwargs)
+			elif self.__update == 'eks-loo':
+				U0 = self.eks_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
 
 			if save_online:
 				try:
@@ -358,7 +360,7 @@ class sampling(enka):
 										str(self.J).zfill(4) + '/',
 							  online = True, counter = i)
 
-			if self.metrics['t'][-1] > 2:
+			if self.metrics['t'][-1] > 5:
 				break
 
 		if model.type == 'pde':
@@ -404,13 +406,18 @@ class sampling(enka):
 		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
 		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-		self.radspec.append(np.linalg.eigvals(D).real.max())
 
-		hk = 1./self.radspec[-1]
+		if kwargs.get('adaptive', None) is None:
+			self.radspec.append(np.linalg.eigvals(D).real.max())
+			hk = 1./self.radspec[-1]
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
+
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
@@ -437,9 +444,10 @@ class sampling(enka):
 		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
 		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-		self.radspec.append(np.linalg.eigvals(D).real.max())
 
+		self.radspec.append(np.linalg.eigvals(D).real.max())
 		hk = 1./self.radspec[-1]
+
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
@@ -463,6 +471,7 @@ class sampling(enka):
 	def eks_update_jacobian(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
+		*** Hardcoded don't use =) ***
 		"""
 
 		# For ensemble update
@@ -532,6 +541,57 @@ class sampling(enka):
 			hk * (self.p + 1)/self.J * (U0 - Umean))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
+
+		return Uk
+
+	def eks_update_loo(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		LOO: Leave-One-Out
+		"""
+		eta     = np.random.normal(0, 1, [self.p, self.J])
+		Umean   = U0.mean(axis = 1)[:, np.newaxis]
+		Gmean   = Geval.mean(axis = 1)[:,np.newaxis]
+		Ucov    = np.cov(U0) + 1e-8 * np.identity(self.p)
+		alpha   = 1./self.J
+		D_bar   = np.zeros((self.J - 1, self.J))
+		idx     = np.arange(self.J)
+		R       = Geval - y_obs[:,np.newaxis]
+		Gamma_R = np.linalg.solve(Gamma, R)
+
+		# 1) Build D_bar
+		for j in range(self.J):
+			Gmean_j    = 1/(1-alpha) * np.copy(Gmean - alpha * Geval[:,j].reshape(-1,1))
+			E_j        = np.copy(Geval[:, idx != j] - Gmean_j)
+			D_bar[:,j] = 1/(self.J-1) * np.matmul(E_j.T, Gamma_R[:,j])
+		self.D_bar = D_bar
+
+		# 2) Compute norm of D_bar
+		norm_D = np.linalg.norm(D_bar)
+		# norm_D = np.sqrt(self.J * (D_bar**2).sum(axis = 1).mean())
+		hk     = 1./(norm_D + 1e-8)
+
+		# 3) Update ensemble members
+		Uk = np.zeros_like(U0)
+		for j in range(self.J):
+			Gmean_j = 1/(1-alpha) * np.copy(Gmean - alpha * Geval[:,j].reshape(-1,1))
+			Umean_j = 1/(1-alpha) * np.copy(Umean - alpha * U0[:,j].reshape(-1,1))
+			delta_j = U0[:,j].reshape(-1,1) - Umean_j
+			Ucov_j  = 1/(1-alpha) * Ucov - alpha * delta_j.dot(delta_j.T)
+			Ustar_  = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov_j.T).T,
+				U0[:,j].reshape(-1,1) - hk * np.matmul(U0[:,idx != j] - Umean_j, D_bar[:,j].reshape(-1,1)) + \
+				hk * np.matmul(Ucov_j, np.linalg.solve(self.sigma, self.mu)))
+			Uk[:,j] = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov_j), eta[:,j].reshape(-1,1))).flatten()
+
+		# 4) Build metrics
+		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
 
 		return Uk
 
