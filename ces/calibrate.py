@@ -360,7 +360,7 @@ class sampling(enka):
 										str(self.J).zfill(4) + '/',
 							  online = True, counter = i)
 
-			if self.metrics['t'][-1] > 5:
+			if self.metrics['t'][-1] > 2:
 				break
 
 		if model.type == 'pde':
@@ -829,7 +829,7 @@ class inversion(enka):
 	def eki_update_jac(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
-		Don't use for inversion! PLEASE!!! :8-) 
+		Don't use for inversion! PLEASE!!! :8-)
 		Still to implement grad logjacobian for EKI
 		"""
 		model = kwargs.get('model', None)
