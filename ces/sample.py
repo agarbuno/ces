@@ -55,7 +55,7 @@ class MCMC(object):
 			Sigma = kwargs.get('Gamma')
 
 		phi_current  = (yG * np.linalg.solve(2 * Sigma, yG)).sum()
-		phi_current -= prior.logpdf(current)
+		phi_current -= prior.logpdf(current.flatten())
 
 		if kwargs.get('model', None) is not None:
 			model = kwargs.get('model', None)
@@ -77,8 +77,8 @@ class MCMC(object):
 				proposal = self.pCN(current, scales, enka.p, beta = kwargs.get('beta', 0.5))
 
 			gmean_proposal, gvars_proposal = emulate.predict_gps(enka, proposal.reshape(1,-1),
-						gpmodels = kwargs.get('gpmodels', None),
-						nugget = kwargs.get('nugget', True),
+						gpmodels  = kwargs.get('gpmodels', None),
+						nugget    = kwargs.get('nugget', True),
 						pca_tools = kwargs.get('pca_tools', None))
 			yGproposal    = gmean_proposal - y
 
@@ -92,7 +92,7 @@ class MCMC(object):
 				Sigma = kwargs.get('Gamma', None)
 
 			phi_proposal  = (yGproposal * np.linalg.solve(2 * Sigma, yGproposal)).sum()
-			phi_proposal -= prior.logpdf(proposal)
+			phi_proposal -= prior.logpdf(proposal.flatten())
 
 			if kwargs.get('model', None) is not None:
 				try:
@@ -103,13 +103,13 @@ class MCMC(object):
 			if kwargs.get('Gamma', None) is None:
 				phi_proposal += .5 * np.log(gvars_proposal).sum()
 			elif kwargs.get('noise_compounded', False):
-				# phi_proposal += .5 * np.log(np.linalg.det(Sigma))
 				phi_proposal += .5 * np.log(np.linalg.eigvals(Sigma)).sum()
+				# phi_proposal += .5 * np.log(np.linalg.det(Sigma))
 
-			if np.random.uniform() < np.exp(phi_current - phi_proposal):
-				current = proposal
-				phi_current = phi_proposal
-				accept += 1.
+			if np.log(np.random.uniform()) < phi_current - phi_proposal:
+				current     = np.copy(proposal)
+				phi_current = np.copy(phi_proposal)
+				accept     += 1.
 
 			samples.append(current)
 
@@ -143,7 +143,7 @@ class MCMC(object):
 			getattr(self, 'samples')
 			samples = list(self.samples.T)
 			current = samples[-1]
-			accepy = 0
+			accept  = 0
 		except AttributeError:
 			samples = []
 			samples.append(current.flatten())
@@ -170,8 +170,8 @@ class MCMC(object):
 				pass
 
 			if np.log(np.random.uniform()) < phi_current - phi_proposal:
-				current     = proposal
-				phi_current = phi_proposal
+				current     = np.copy(proposal)
+				phi_current = np.copy(phi_proposal)
 				accept += 1.
 
 			samples.append(current.flatten())
