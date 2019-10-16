@@ -295,6 +295,12 @@ class lorenz96(object):
 
 		return Phi[:,-1]
 
+	def grad_logjacobian(self, params):
+		gradlogjac = np.zeros_like(params)
+		gradlogjac[2] = -np.exp(-gradlogjac[2])
+
+		return gradlogjac
+
 class lorenz96Fc(lorenz96):
 	def __init__(self):
 		super().__init__()
