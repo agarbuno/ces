@@ -338,7 +338,7 @@ class sampling(enka):
 			elif self.__update == 'eks-corrected':
 				U0 = self.eks_update_corrected(y_obs, U0, Geval, Gamma, i)
 			elif self.__update == 'eks-jacobian':
-				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
+				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-jacobian-corrected':
 				U0 = self.eks_update_jac_cor(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-loo':
