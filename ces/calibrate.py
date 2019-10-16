@@ -339,6 +339,8 @@ class sampling(enka):
 				U0 = self.eks_update_corrected(y_obs, U0, Geval, Gamma, i)
 			elif self.__update == 'eks-jacobian':
 				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, model = model)
+			elif self.__update == 'eks-jacobian-corrected':
+				U0 = self.eks_update_jac_cor(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-loo':
 				U0 = self.eks_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
 
@@ -462,6 +464,49 @@ class sampling(enka):
 			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
 			hk * np.matmul(Ucov, grad_logjacobian))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+			np.random.normal(0, 1, [self.p, self.J])))
+
+		return Uk
+
+	def eks_update_jac_cor(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		Uses the gradient of the logJacobian to correct for curvature.
+		Uses the finite ensemble correction for the Langevin diffusion. 
+		"""
+		model = kwargs.get('model', None)
+
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+
+		# Track metrics
+		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+
+		self.radspec.append(np.linalg.eigvals(D).real.max())
+		hk = 1./self.radspec[-1]
+
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+
+		if model is not None:
+			grad_logjacobian = model.grad_logjacobian(U0)
+		else :
+			grad_logjacobian = 0.0 * U0
+
+		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
+			hk * np.matmul(Ucov, grad_logjacobian)) + \
+			hk * (self.p + 1)/self.J * (U0 - Umean))
+		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul(np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
 		return Uk
