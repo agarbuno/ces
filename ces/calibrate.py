@@ -472,7 +472,7 @@ class sampling(enka):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		Uses the gradient of the logJacobian to correct for curvature.
-		Uses the finite ensemble correction for the Langevin diffusion. 
+		Uses the finite ensemble correction for the Langevin diffusion.
 		"""
 		model = kwargs.get('model', None)
 
@@ -504,7 +504,7 @@ class sampling(enka):
 
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
 			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-			hk * np.matmul(Ucov, grad_logjacobian)) + \
+			hk * np.matmul(Ucov, grad_logjacobian) + \
 			hk * (self.p + 1)/self.J * (U0 - Umean))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul(np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
