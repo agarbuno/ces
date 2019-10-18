@@ -455,7 +455,11 @@ class sampling(enka):
 		else:
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
-		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+
+		if kwargs.get('delta', None) is not None:
+			Ucov  = np.cov(U0) + delta * np.identity(self.p)
+		else:
+			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
 		if model is not None:
 			grad_logjacobian = model.grad_logjacobian(U0)
