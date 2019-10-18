@@ -457,7 +457,7 @@ class sampling(enka):
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 
 		if kwargs.get('delta', None) is not None:
-			Ucov  = np.cov(U0) + delta * np.identity(self.p)
+			Ucov  = np.cov(U0) + kwargs.get('delta') * np.identity(self.p)
 		else:
 			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
