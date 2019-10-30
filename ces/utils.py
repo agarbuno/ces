@@ -11,7 +11,7 @@ class lineal(object):
 		self.A = A
 		self.n_obs = A.shape[0]
 		self.flag_noise = flag_noise
-		self.noise_sigma = 0.1
+		self.noise_sigma = np.sqrt(0.1)
 		self.model_name = 'lineal'
 		self.type = 'map'
 
@@ -38,7 +38,7 @@ class elliptic(object):
 		self.x1 = 1./4
 		self.x2 = 3./4
 		self.flag_noise = flag_noise
-		self.noise      = 0.1
+		self.sigma      = np.sqrt(0.1)
 		self.model_name = 'elliptic'
 		self.type       = 'map'
 
@@ -52,8 +52,8 @@ class elliptic(object):
 		"""
 		"""
 		u1, u2 = theta
-		x = (u2 * self.x1) + (np.exp(-u1) * (-self.x1**2+self.x1) * 0.5) + (self.flag_noise * self.noise * np.random.normal())
-		y = (u2 * self.x2) + (np.exp(-u1) * (-self.x2**2+self.x2) * 0.5) + (self.flag_noise * self.noise * np.random.normal())
+		x = (u2 * self.x1) + (np.exp(-u1) * (-self.x1**2+self.x1) * 0.5) + (self.flag_noise * self.sigma * np.random.normal())
+		y = (u2 * self.x2) + (np.exp(-u1) * (-self.x2**2+self.x2) * 0.5) + (self.flag_noise * self.sigma * np.random.normal())
 
 		if dG:
 			DG = np.array([[-np.exp(-u1) * (-self.x1**2+self.x1) * 0.5, self.x1],
@@ -300,6 +300,30 @@ class lorenz96(object):
 		gradlogjac[2] = -np.exp(-gradlogjac[2])
 
 		return gradlogjac
+
+class lorenz96_hom(lorenz96):
+	def __init__(self):
+		super().__init__()
+
+	def __repr__(self):
+		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(2)
+
+	def __str__(self):
+		"""
+		Printing method
+		"""
+		print('Model: ..................... Lorenz 96')
+		print('Number of slow variables ... %s'%(self.n_slow))
+		print('Number of fast variables ... %s'%(self.n_fast))
+		print('Number of parameters........ %s'%(2))
+		print('Solver initialized ......... %s'%(self.solve_init))
+		return str()
+
+	def __call__(self, t, w, h = 1., F = 10., log_c = np.log(10.), b = 10.):
+		"""
+		"""
+		ws = self.model(w, t, h, F, log_c, b)
+		return ws.reshape(5, -1).mean(axis = 1)
 
 class lorenz96Fc(lorenz96):
 	def __init__(self):

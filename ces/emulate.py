@@ -9,6 +9,7 @@ import gpflow as gp
 from tqdm.autonotebook import tqdm
 
 def scale_ensemble(enka, factor = 2.):
+	enka.scale = {}
 	enka.scale['mean'] = enka.Ustar.mean(axis = 1)[:, np.newaxis]
 	enka.scale['cov']  = factor * np.linalg.cholesky(np.cov(enka.Ustar))
 	enka.scale['X']    = np.linalg.solve(enka.scale_cov, enka.Ustar - enka.scale_mean)

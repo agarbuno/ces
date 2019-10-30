@@ -362,7 +362,7 @@ class sampling(enka):
 										str(self.J).zfill(4) + '/',
 							  online = True, counter = i)
 
-			if self.metrics['t'][-1] > 2:
+			if self.metrics['t'][-1] > kwargs.get('t_tol', 2.):
 				break
 
 		if model.type == 'pde':
@@ -520,7 +520,7 @@ class sampling(enka):
 	def eks_update_corrected(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
-		Reich correction
+		Reich and Nusken's linear correction.
 		"""
 
 		# For ensemble update
