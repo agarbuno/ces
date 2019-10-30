@@ -305,20 +305,6 @@ class lorenz96_hom(lorenz96):
 	def __init__(self):
 		super().__init__()
 
-	def __repr__(self):
-		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(2)
-
-	def __str__(self):
-		"""
-		Printing method
-		"""
-		print('Model: ..................... Lorenz 96')
-		print('Number of slow variables ... %s'%(self.n_slow))
-		print('Number of fast variables ... %s'%(self.n_fast))
-		print('Number of parameters........ %s'%(2))
-		print('Solver initialized ......... %s'%(self.solve_init))
-		return str()
-
 	def statistics(self, ws):
 		ws = ws.T
 		data = np.copy(ws[:,(self.spinup * self.freq + 1):].reshape(self.n_state, -1, self.l_window * self.freq))
