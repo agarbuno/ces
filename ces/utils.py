@@ -319,11 +319,17 @@ class lorenz96_hom(lorenz96):
 		print('Solver initialized ......... %s'%(self.solve_init))
 		return str()
 
-	def __call__(self, t, w, h = 1., F = 10., log_c = np.log(10.), b = 10.):
-		"""
-		"""
-		ws = self.model(w, t, h, F, log_c, b)
-		return ws.reshape(5, -1).mean(axis = 1)
+	def statistics(self, ws):
+		ws = ws.T
+		data = np.copy(ws[:,(self.spinup * self.freq + 1):].reshape(self.n_state, -1, self.l_window * self.freq))
+
+		Phi = np.vstack([data[:self.n_slow].mean(axis = 2),
+			(data[:self.n_slow]**2).mean(axis = 2),
+			data[self.n_slow:].reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1).mean(axis = 2),
+			(data[self.n_slow:]**2).reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1).mean(axis = 2),
+			(data[:self.n_slow] * (data[self.n_slow:]).reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1)).mean(axis = 2)])
+
+		return Phi[:,-1].reshape(5, -1).mean(axis = 1)
 
 class lorenz96Fc(lorenz96):
 	def __init__(self):
