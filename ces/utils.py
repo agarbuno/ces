@@ -304,6 +304,7 @@ class lorenz96(object):
 class lorenz96_hom(lorenz96):
 	def __init__(self):
 		super().__init__()
+		self.hom = True
 
 	def statistics(self, ws):
 		ws = ws.T
@@ -315,7 +316,10 @@ class lorenz96_hom(lorenz96):
 			(data[self.n_slow:]**2).reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1).mean(axis = 2),
 			(data[:self.n_slow] * (data[self.n_slow:]).reshape(self.n_slow, self.n_fast, -1, self.l_window * self.freq ).mean(axis = 1)).mean(axis = 2)])
 
-		return Phi[:,-1].reshape(5, -1).mean(axis = 1)
+		if self.hom :
+			return Phi[:,-1].reshape(5, -1).mean(axis = 1)
+		else:
+			return Phi[:,-1].reshape(5, -1)[:, 7]
 
 class lorenz96Fc(lorenz96):
 	def __init__(self):
