@@ -61,7 +61,9 @@ class MCMC(object):
 			model = kwargs.get('model', None)
 			try:
 				phi_current -= model.logjacobian(current)
+				tqdm.print('w/Jacobian adjustment')
 			except AttributeError:
+				tqdm.print('wo/Jacobian adjustment')
 				pass
 
 		if kwargs.get('Gamma', None) is None:
@@ -118,12 +120,11 @@ class MCMC(object):
 
 	def model_mh(self, model, n_mcmc, prior, enka, Gamma, delta = 1., enka_scaling = True, **kwargs):
 		if enka_scaling:
-			scales = delta * np.linalg.cholesky(np.cov(enka.Ustar))
+			scales = delta * np.linalg.cholesky(np.cov(enka.Ustar).reshape(enka.p, enka.p))
 		else:
 			scales = delta * np.eye(enka.p)
 
 		current = enka.Ustar.mean(axis = 1)
-
 		if model.type == 'pde':
 			w_mcmc  = np.copy(model.wt)
 			g = enka.G_pde(np.hstack([current.flatten(), w_mcmc]), model, model.t)
@@ -136,6 +137,7 @@ class MCMC(object):
 		phi_current -= prior.logpdf(current.flatten())
 		try:
 			phi_current -= model.logjacobian(current.flatten())
+			tqdm.write(str(model.logjacobian(current.flatten())))
 		except AttributeError:
 			pass
 

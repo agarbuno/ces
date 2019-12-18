@@ -29,6 +29,26 @@ class lineal(object):
 		else:
 			return np.matmul(self.A, theta)
 
+class lineal_log(lineal):
+	def __init__(self, A, flag_noise = False):
+		super().__init__(A, flag_noise = flag_noise)
+		self.model_name        = 'lineal_log'
+		self.jacobian_adjusted = True
+
+	def __call__(self, phi):
+		"""
+		"""
+		return super().__call__(np.exp(phi))
+
+	def grad_logjacobian(self, params):
+			return - np.exp(-params)
+
+	def logjacobian(self, params):
+		if self.jacobian_adjusted:
+			return - params.sum(axis = 0)
+		else:
+			return 0.0
+
 class elliptic(object):
 	"""
 	"""

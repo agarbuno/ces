@@ -338,7 +338,7 @@ class sampling(enka):
 			elif self.__update == 'eks-corrected':
 				U0 = self.eks_update_corrected(y_obs, U0, Geval, Gamma, i)
 			elif self.__update == 'eks-jacobian':
-				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, model = model, **kwargs)
 			elif self.__update == 'eks-jacobian-corrected':
 				U0 = self.eks_update_jac_cor(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-jacobian-tempered':
@@ -397,6 +397,7 @@ class sampling(enka):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
+		self.update_rule = 'eks_update'
 
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -435,6 +436,7 @@ class sampling(enka):
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
 		model = kwargs.get('model', None)
+		self.update_rule = 'eks_update_jac'
 
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -447,8 +449,11 @@ class sampling(enka):
 		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		self.radspec.append(np.linalg.eigvals(D).real.max())
-		hk = 1./self.radspec[-1]
+		if kwargs.get('adaptive', None) is None:
+			self.radspec.append(np.linalg.eigvals(D).real.max())
+			hk = 1./self.radspec[-1]
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./(np.linalg.norm(D) + 1e-8)
 
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
