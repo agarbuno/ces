@@ -221,7 +221,7 @@ class enka(object):
 				self.Uall = []
 				self.Gall = []
 				if flag_metrics:
-					for iter in range(len(self.metrics['v'])):
+					for iter in range(len(self.metrics['self-bias'])):
 						self.Uall.append(np.load(path + eks_dir + 'ensemble_'  + str(iter).zfill(4) + '.npy'))
 						self.Gall.append(np.load(path + eks_dir + 'Gensemble_' + str(iter).zfill(4) + '.npy'))
 				else:
@@ -306,10 +306,10 @@ class sampling(enka):
 			# Storing metrics
 			self.radspec = []
 			self.metrics = dict()
-			self.metrics['v'] = []			# Tracks collapse in parameter space
-			self.metrics['V'] = []			# Tracks collapse after forward model evaln
-			self.metrics['R'] = []			# Tracks data-fitting
-			self.metrics['r'] = []			# Tracks the collapse towards the truth
+			self.metrics['self-bias'] = []			# Tracks collapse in parameter space
+			self.metrics['self-bias-data'] = []			# Tracks collapse after forward model evaln
+			self.metrics['bias-data'] = []			# Tracks data-fitting
+			self.metrics['bias'] = []			# Tracks the collapse towards the truth
 			self.metrics['t'] = []
 
 		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
@@ -334,9 +334,9 @@ class sampling(enka):
 			Geval = Geval[:self.n_obs,:]
 
 			if   self.__update == 'eks':
-				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i)
-			elif self.__update == 'eks-corrected':
-				U0 = self.eks_update_corrected(y_obs, U0, Geval, Gamma, i)
+				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i, **kwargs)
+			elif self.__update == 'eks-linear':
+				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs	)
 			elif self.__update == 'eks-jacobian':
 				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, model = model, **kwargs)
 			elif self.__update == 'eks-jacobian-corrected':
@@ -405,16 +405,12 @@ class sampling(enka):
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		if kwargs.get('adaptive', None) is None:
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			hk = 1./self.radspec[-1]
-		elif kwargs.get('adaptive') == 'norm':
-			hk = 1./(np.linalg.norm(D) + 1e-8)
+		hk = self.timestep_method(D, **kwargs)
 
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
@@ -444,10 +440,10 @@ class sampling(enka):
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		if kwargs.get('adaptive', None) is None:
 			self.radspec.append(np.linalg.eigvals(D).real.max())
@@ -493,18 +489,24 @@ class sampling(enka):
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		self.radspec.append(np.linalg.eigvals(D).real.max())
-		hk = 1./self.radspec[-1]
+		if kwargs.get('adaptive', None) is None:
+			self.radspec.append(np.linalg.eigvals(D).real.max())
+			hk = 1./self.radspec[-1]
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+		elif kwargs.get('adaptive') == 'constant':
+			hk = kwargs.get('delta_t', 0.1)
 
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
+
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
@@ -522,11 +524,12 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_corrected(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+	def eks_update_linear(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
-		Reich and Nusken's linear correction.
+		ALDI's linear correction.
 		"""
+		self.update_rule = 'eks_update_jac'
 
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -534,13 +537,19 @@ class sampling(enka):
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-		self.radspec.append(np.linalg.eigvals(D).real.max())
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		hk = 1./self.radspec[-1]
+		if kwargs.get('adaptive', None) is None:
+			self.radspec.append(np.linalg.eigvals(D).real.max())
+			hk = 1./self.radspec[-1]
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+		elif kwargs.get('adaptive') == 'constant':
+			hk = kwargs.get('delta_t', 0.1)
+
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
@@ -596,10 +605,10 @@ class sampling(enka):
 			Uk[:,j] = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov_j), eta[:,j].reshape(-1,1))).flatten()
 
 		# 4) Build metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
@@ -620,10 +629,10 @@ class sampling(enka):
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		self.radspec.append(np.linalg.eigvals(D).real.max())
 		hk = 1./self.radspec[-1]
@@ -647,6 +656,18 @@ class sampling(enka):
 			np.random.normal(0, 1, [self.p, self.J])))
 
 		return Uk
+
+	def timestep_method(self, D, **kwargs):
+		if kwargs.get('adaptive', None) is None:
+			self.radspec.append(np.linalg.eigvals(D).real.max())
+			hk = 1./self.radspec[-1]
+		elif kwargs.get('adaptive') == 'norm':
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+		elif kwargs.get('adaptive') == 'constant':
+			hk = kwargs.get('delta_t', 0.1)
+
+		return hk
+
 
 # ------------------------------------------------------------------------------
 
@@ -716,10 +737,10 @@ class inversion(enka):
 			# Storing metrics
 			self.radspec = []
 			self.metrics = dict()
-			self.metrics['v'] = []			# Tracks collapse in parameter space
-			self.metrics['V'] = []			# Tracks collapse after forward model evaln
-			self.metrics['R'] = []			# Tracks data-fitting
-			self.metrics['r'] = []			# Tracks the collapse towards the truth
+			self.metrics['self-bias'] = []			# Tracks collapse in parameter space
+			self.metrics['self-bias-data'] = []			# Tracks collapse after forward model evaln
+			self.metrics['bias-data'] = []			# Tracks data-fitting
+			self.metrics['bias'] = []			# Tracks the collapse towards the truth
 			self.metrics['t'] = []
 
 		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
@@ -819,10 +840,10 @@ class inversion(enka):
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma + hk * Cpp, R))
 
 		# Track metrics
-		# self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		# self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		# self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		# self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 		# self.radspec.append(np.linalg.eigvals(D).real.max())
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
@@ -863,10 +884,10 @@ class inversion(enka):
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
 
 		# Track metrics
-		# self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		# self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		# self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		# self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 		# self.radspec.append(np.linalg.eigvals(D).real.max())
 
 		dU = - hk * np.matmul(U0 - Umean, D)
@@ -893,10 +914,10 @@ class inversion(enka):
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
 
 		# Track metrics
-		self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 		self.radspec.append(np.linalg.eigvals(D).real.max())
 
 		hk = 1./self.radspec[-1]
@@ -934,10 +955,10 @@ class inversion(enka):
 		Cup = (1./self.J) * np.matmul(R, E.T)
 
 		# Track metrics
-		# self.metrics['v'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		# self.metrics['r'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		# self.metrics['V'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		# self.metrics['R'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+		# self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		# self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		# self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		# self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		if kwargs.get('adaptive', None) is None:
 			hk = 1.

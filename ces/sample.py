@@ -59,12 +59,12 @@ class MCMC(object):
 
 		if kwargs.get('model', None) is not None:
 			model = kwargs.get('model', None)
-			try:
-				phi_current -= model.logjacobian(current)
-				tqdm.print('w/Jacobian adjustment')
-			except AttributeError:
-				tqdm.print('wo/Jacobian adjustment')
-				pass
+			# try:
+			# 	phi_current -= model.logjacobian(current)
+			# 	tqdm.print('w/Jacobian adjustment')
+			# except AttributeError:
+			# 	tqdm.print('wo/Jacobian adjustment')
+			# 	pass
 
 		if kwargs.get('Gamma', None) is None:
 			phi_current += .5 * np.log(gvars).sum()
@@ -96,11 +96,11 @@ class MCMC(object):
 			phi_proposal  = (yGproposal * np.linalg.solve(2 * Sigma, yGproposal)).sum()
 			phi_proposal -= prior.logpdf(proposal.flatten())
 
-			if kwargs.get('model', None) is not None:
-				try:
-					phi_proposal -= model.logjacobian(proposal)
-				except AttributeError:
-					pass
+			# if kwargs.get('model', None) is not None:
+			# 	try:
+			# 		phi_proposal -= model.logjacobian(proposal)
+			# 	except AttributeError:
+			# 		pass
 
 			if kwargs.get('Gamma', None) is None:
 				phi_proposal += .5 * np.log(gvars_proposal).sum()
@@ -135,11 +135,11 @@ class MCMC(object):
 		yg = g[:enka.n_obs] - self.y_obs
 		phi_current = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 		phi_current -= prior.logpdf(current.flatten())
-		try:
-			phi_current -= model.logjacobian(current.flatten())
-			tqdm.write(str(model.logjacobian(current.flatten())))
-		except AttributeError:
-			pass
+		# try:
+		# 	phi_current -= model.logjacobian(current.flatten())
+		# 	tqdm.write(str(model.logjacobian(current.flatten())))
+		# except AttributeError:
+		# 	pass
 
 		try:
 			getattr(self, 'samples')
@@ -166,10 +166,10 @@ class MCMC(object):
 			yg = g_proposal[:enka.n_obs] - self.y_obs
 			phi_proposal  = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 			phi_proposal -= prior.logpdf(proposal.flatten())
-			try:
-				phi_proposal -= model.logjacobian(proposal.flatten())
-			except AttributeError:
-				pass
+			# try:
+			# 	phi_proposal -= model.logjacobian(proposal.flatten())
+			# except AttributeError:
+			# 	pass
 
 			if np.log(np.random.uniform()) < phi_current - phi_proposal:
 				current     = np.copy(proposal)
