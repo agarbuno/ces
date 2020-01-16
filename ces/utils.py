@@ -82,18 +82,38 @@ class elliptic(object):
 		else:
 			return [x,y]
 
-def banana(u, a = 1., b = .5, flag_noise = False):
-	rho = 0.95
-	Gamma = np.identity(2)
-	Gamma[0,1] = rho
-	Gamma[1,0] = rho
+class banana(object):
+	"""
+	"""
+	def __init__(self, a = 1.0, b = .5, rho = .9, flag_noise = False):
+		"""
+		"""
+		self.flag_noise = flag_noise
+		self.sigma      = np.sqrt(0.55)
+		self.model_name = 'banana'
+		self.type       = 'map'
 
-	Gamma = (0.55**2) * Gamma
+		self.a = a
+		self.b = b
 
-	u1, u2 = u
-	x = u1 * a
-	y = u2/a - b *(u1**2 + a**2)
-	return np.array([x, y]) + flag_noise * np.linalg.cholesky(Gamma).dot(np.random.normal(0, 1, [2,]))
+		self.Gamma = np.identity(2)
+		self.Gamma[0,1] = rho
+		self.Gamma[1,0] = rho
+		self.Gamma = (0.55**2) * self.Gamma
+
+	def __repr__(self):
+		return self.model_name
+
+	def __str__(self):
+		return self.model_name
+
+	def __call__(self, theta, dG = False):
+		"""
+		"""
+		u1, u2 = theta
+		x = u1 * self.a
+		y = u2/self.a - self.b *(u1**2 + self.a**2)
+		return np.array([x, y]) + self.flag_noise * np.linalg.cholesky(self.Gamma).dot(np.random.normal(0, 1, [2,]))
 
 class lorenz63(object):
 	"""

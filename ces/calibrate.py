@@ -411,7 +411,6 @@ class sampling(enka):
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		hk = self.timestep_method(D, **kwargs)
-
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
@@ -769,7 +768,7 @@ class inversion(enka):
 			elif self.__update == 'eki-corrected':
 				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 			elif self.__update == 'eki-flow':
-				U0 = self.eki_update_flow(y_obs, U0, Geval, Gamma, Jnoise, i, model = model)
+				U0 = self.eki_update_flow(y_obs, U0, Geval, Gamma, Jnoise, i, model = model, **kwargs)
 			elif self.__update == 'eki-jacobian':
 				U0 = self.eki_update_jacobian(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 
@@ -875,9 +874,14 @@ class inversion(enka):
 		Cup = (1./self.J) * np.matmul(U0 - Umean, E.T)
 
 		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-		self.radspec.append(np.linalg.eigvals(D).real.max())
 
-		hk = 1./self.radspec[-1]
+		if kwargs.get('adaptive') == 'constant':
+			hk = 1./self.T
+		else:
+			self.radspec.append(np.linalg.eigvals(D).real.max())
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+			# hk = 1./self.radspec[-1]
+
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
 		else:
@@ -897,92 +901,6 @@ class inversion(enka):
 			)
 
 		Uk = U0 + dU + dW
-
-		return Uk
-
-	def eki_update_jac(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
-		"""
-		Ensemble update based on the continuous time limit of the EKS.
-		Don't use for inversion! PLEASE!!! :8-)
-		Still to implement grad logjacobian for EKI
-		"""
-		model = kwargs.get('model', None)
-
-		# For ensemble update
-		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-		R = Geval - y_obs[:,np.newaxis]
-		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-
-		# Track metrics
-		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-		self.radspec.append(np.linalg.eigvals(D).real.max())
-
-		hk = 1./self.radspec[-1]
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
-		Umean = U0.mean(axis = 1)[:, np.newaxis]
-		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-
-		if model is not None:
-			grad_logjacobian = model.grad_logjacobian(U0)
-		else :
-			grad_logjacobian = 0.0 * U0
-
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-			hk * np.matmul(Ucov, grad_logjacobian))
-		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-			np.random.normal(0, 1, [self.p, self.J])))
-
-		return np.zeros_like(U0)
-
-	def eki_update_jacobian(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
-		"""
-		Ensemble update based on the continuous time limit of the EKI.
-		Still to implement grad logjacobian for EKI
-		"""
-		# For ensemble update
-		eta = np.random.normal(0, 1, [self.n_obs, self.J])
-		E   = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-		R   = U0 - U0.mean(axis = 1)[:,np.newaxis]
-
-		Cpp = (1./self.J) * np.matmul(E, E.T)
-		Cup = (1./self.J) * np.matmul(R, E.T)
-
-		# Track metrics
-		# self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		# self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		# self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		# self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
-		if kwargs.get('adaptive', None) is None:
-			hk = 1.
-		elif kwargs.get('adaptive') == 'norm':
-			hk = 1./self.T
-
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
-
-		# This is a temporal solution is very hardcoded! -----------------------
-		# Jacobian = 0.0 * U0
-		# Jacobian[2] = -np.exp(-U0[2])
-		# ----------------------------------------------------------------------
-
-		# dU = - np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, y_obs[:,np.newaxis] + \
-		# 	np.matmul(np.sqrt(self.T) * Jnoise, eta) - Geval))
-		# Uk = U0 - hk * dU
-
-		dU = hk * np.matmul(Cup, np.linalg.solve(hk * Cpp + Gamma, y_obs[:,np.newaxis] - Geval))
-		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma, np.matmul(Jnoise, eta)))
-		Uk = U0 + dU + dW
-		# hk * np.matmul(Ucov, Jacobian))
 
 		return Uk
 
