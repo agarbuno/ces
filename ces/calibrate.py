@@ -410,17 +410,17 @@ class sampling(enka):
 		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		hk = self.timestep_method(D, **kwargs)
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
+		if kwargs.get('time_step', None) == 'adaptive':
+			Cpp = np.cov(Geval, bias = True)
+			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
 
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)))
+			U0 - hk * np.matmul(U0 - Umean, D)  + \
+			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)))
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
 
@@ -444,16 +444,8 @@ class sampling(enka):
 		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		if kwargs.get('adaptive', None) is None:
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			hk = 1./self.radspec[-1]
-		elif kwargs.get('adaptive') == 'norm':
-			hk = 1./(np.linalg.norm(D) + 1e-8)
+		hk = self.timestep_method(D, **kwargs)
 
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 
 		if kwargs.get('delta', None) is not None:
@@ -493,18 +485,7 @@ class sampling(enka):
 		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		if kwargs.get('adaptive', None) is None:
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			hk = 1./self.radspec[-1]
-		elif kwargs.get('adaptive') == 'norm':
-			hk = 1./(np.linalg.norm(D) + 1e-8)
-		elif kwargs.get('adaptive') == 'constant':
-			hk = kwargs.get('delta_t', 0.1)
-
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		hk = self.timestep_method(D, **kwargs)
 
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
@@ -541,18 +522,8 @@ class sampling(enka):
 		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		if kwargs.get('adaptive', None) is None:
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			hk = 1./self.radspec[-1]
-		elif kwargs.get('adaptive') == 'norm':
-			hk = 1./(np.linalg.norm(D) + 1e-8)
-		elif kwargs.get('adaptive') == 'constant':
-			hk = kwargs.get('delta_t', 0.1)
+		hk = self.timestep_method(D, Geval, y_obs, Gamma, [], **kwargs)
 
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
@@ -656,17 +627,41 @@ class sampling(enka):
 
 		return Uk
 
-	def timestep_method(self, D, **kwargs):
-		if kwargs.get('adaptive', None) is None:
+	def timestep_method(self, D, Geval, y_obs, Gamma, Jnoise, **kwargs):
+		if kwargs.get('time_step', None) is None:
 			self.radspec.append(np.linalg.eigvals(D).real.max())
 			hk = 1./self.radspec[-1]
-		elif kwargs.get('adaptive') == 'norm':
+		elif kwargs.get('time_step') == 'norm':
 			hk = 1./(np.linalg.norm(D) + 1e-8)
-		elif kwargs.get('adaptive') == 'constant':
+		elif kwargs.get('time_step') == 'constant':
+			hk = kwargs.get('delta_t', 0.2)
+		elif kwargs.get('time_step') == 'adaptive':
 			hk = kwargs.get('delta_t', 0.1)
+			# hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
+
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
 
 		return hk
 
+	def LM_procedure(self, Geval, y_obs, Gamma, Jnoise, **kwargs):
+		rho_LM = kwargs.get('rho_LM', .8)
+
+		Cpp   = np.cov(Geval, bias = True)
+		Gmean = Geval.mean(axis = 1)
+
+		lower_LM = rho_LM * np.linalg.norm(np.linalg.solve(Jnoise, Gmean - y_obs[:,np.newaxis]))
+		alpha = 1.
+
+		upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
+
+		while upper_LM < lower_LM:
+			alpha = 2 * alpha
+			upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
+
+		return 1./alpha
 
 # ------------------------------------------------------------------------------
 
@@ -821,9 +816,9 @@ class inversion(enka):
 		"""
 		Ensemble update based on the continuous time limit of the EKI.
 		"""
-		if kwargs.get('adaptive', None) is None:
+		if kwargs.get('time_step', None) is None:
 			hk = 1.
-		elif kwargs.get('adaptive') == 'norm':
+		elif kwargs.get('time_step') == 'constant':
 			hk = 1./self.T
 
 		# For ensemble update
@@ -873,19 +868,10 @@ class inversion(enka):
 		Cpp = (1./self.J) * np.matmul(E, E.T)
 		Cup = (1./self.J) * np.matmul(U0 - Umean, E.T)
 
-		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+		resid = y_obs[:,np.newaxis] - Geval.mean(axis = 1)[:,np.newaxis]
+		hk = self.timestep_method([], Geval, y_obs, Gamma, Jnoise, **kwargs)
 
-		if kwargs.get('adaptive') == 'constant':
-			hk = 1./self.T
-		else:
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			hk = 1./(np.linalg.norm(D) + 1e-8)
-			# hk = 1./self.radspec[-1]
-
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
 
 		# Track metrics
 		# self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
@@ -895,7 +881,7 @@ class inversion(enka):
 		# self.radspec.append(np.linalg.eigvals(D).real.max())
 
 		dU = - hk * np.matmul(U0 - Umean, D)
-		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve(Gamma,
+		dW = np.sqrt(hk) * np.matmul(Cup,  np.linalg.solve(hk * Cpp + Gamma,
 				np.matmul(Jnoise, eta)
 				)
 			)
@@ -903,5 +889,39 @@ class inversion(enka):
 		Uk = U0 + dU + dW
 
 		return Uk
+
+	def timestep_method(self, D, Geval, y_obs, Gamma, Jnoise, **kwargs):
+		if kwargs.get('time_step', None) is None:
+			hk = 1.
+		elif kwargs.get('time_step') == 'norm':
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+		elif kwargs.get('time_step') == 'constant':
+			hk = kwargs.get('delta_t', 1./self.T)
+		elif kwargs.get('time_step') == 'adaptive':
+			hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
+
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+
+		return hk
+
+	def LM_procedure(self, Geval, y_obs, Gamma, Jnoise, **kwargs):
+		rho_LM = kwargs.get('rho_LM', .5)
+
+		Cpp   = np.cov(Geval, bias = True)
+		Gmean = Geval.mean(axis = 1)
+
+		lower_LM = rho_LM * np.linalg.norm(np.linalg.solve(Jnoise, Gmean - y_obs[:,np.newaxis]))
+		alpha = 1.
+
+		upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
+
+		while upper_LM < lower_LM:
+			alpha = 2 * alpha
+			upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
+
+		return 1./alpha
 
 # ------------------------------------------------------------------------------
