@@ -337,10 +337,6 @@ class sampling(enka):
 				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-linear':
 				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs	)
-			elif self.__update == 'eks-jacobian':
-				U0 = self.eks_update_jac(y_obs, U0, Geval, Gamma, i, model = model, **kwargs)
-			elif self.__update == 'eks-jacobian-corrected':
-				U0 = self.eks_update_jac_cor(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-jacobian-tempered':
 				U0 = self.eks_update_jac_temp(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-loo':
@@ -426,90 +422,12 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_jac(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
-		"""
-		Ensemble update based on the continuous time limit of the EKS.
-		"""
-		model = kwargs.get('model', None)
-		self.update_rule = 'eks_update_jac'
-
-		# For ensemble update
-		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-		R = Geval - y_obs[:,np.newaxis]
-		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-
-		# Track metrics
-		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
-		hk = self.timestep_method(D, **kwargs)
-
-		Umean = U0.mean(axis = 1)[:, np.newaxis]
-
-		if kwargs.get('delta', None) is not None:
-			Ucov  = np.cov(U0) + kwargs.get('delta') * np.identity(self.p)
-		else:
-			Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-
-		if model is not None:
-			grad_logjacobian = model.grad_logjacobian(U0)
-		else :
-			grad_logjacobian = 0.0 * U0
-
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-			hk * np.matmul(Ucov, grad_logjacobian))
-		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-			np.random.normal(0, 1, [self.p, self.J])))
-
-		return Uk
-
-	def eks_update_jac_cor(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
-		"""
-		Ensemble update based on the continuous time limit of the EKS.
-		Uses the gradient of the logJacobian to correct for curvature.
-		Uses the finite ensemble correction for the Langevin diffusion.
-		"""
-		model = kwargs.get('model', None)
-
-		# For ensemble update
-		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-		R = Geval - y_obs[:,np.newaxis]
-		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-
-		# Track metrics
-		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
-		hk = self.timestep_method(D, **kwargs)
-
-		Umean = U0.mean(axis = 1)[:, np.newaxis]
-		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-
-		if model is not None:
-			grad_logjacobian = model.grad_logjacobian(U0)
-		else :
-			grad_logjacobian = 0.0 * U0
-
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-			hk * np.matmul(Ucov, grad_logjacobian) + \
-			hk * (self.p + 1)/self.J * (U0 - Umean))
-		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul(np.linalg.cholesky(Ucov),
-			np.random.normal(0, 1, [self.p, self.J])))
-
-		return Uk
-
 	def eks_update_linear(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		ALDI's linear correction.
 		"""
-		self.update_rule = 'eks_update_jac'
+		self.update_rule = 'eks_update_linear'
 
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -526,12 +444,28 @@ class sampling(enka):
 
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+		alpha_J = ((self.p + 1)/self.J)
 
+		# ------------------     Implicit prior term  --------------------------
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
 			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-			hk * (self.p + 1)/self.J * (U0 - Umean))
+			hk * alpha_J * (U0 - Umean))
+
+		# ------------------     Implicit prior linear / term ------------------
+		# Ustar_ = np.linalg.solve( (1 - hk * alpha_J) * np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+		# 	U0 - hk * np.matmul(U0 - Umean, D)  + \
+		# 	hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) - \
+		# 	hk * alpha_J * Umean)
+
 		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 			np.random.normal(0, 1, [self.p, self.J])))
+
+		# ------------------     Explicit as it can get ------------------------
+		# Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
+		# 	hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
+		# 	hk * alpha_J * (U0 - Umean) + \
+		# 	np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+		# 		np.random.normal(0, 1, [self.p, self.J]))
 
 		return Uk
 
@@ -583,47 +517,6 @@ class sampling(enka):
 			self.metrics['t'].append(hk)
 		else:
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
-
-		return Uk
-
-	def eks_update_jac_temp(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
-		"""
-		Ensemble update based on the continuous time limit of the EKS.
-		"""
-		model = kwargs.get('model', None)
-		beta_inv  = 1./kwargs.get('beta',  1.0)
-
-		# For ensemble update
-		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-		R = Geval - y_obs[:,np.newaxis]
-		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-
-		# Track metrics
-		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
-		self.radspec.append(np.linalg.eigvals(D).real.max())
-		hk = 1./self.radspec[-1]
-
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
-		Umean = U0.mean(axis = 1)[:, np.newaxis]
-		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-
-		if model is not None:
-			grad_logjacobian = model.grad_logjacobian(U0)
-		else :
-			grad_logjacobian = 0.0 * U0
-
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-			hk * np.matmul(Ucov, grad_logjacobian))
-		Uk     = (Ustar_ + np.sqrt(2*hk*beta_inv) * np.matmul( np.linalg.cholesky(Ucov),
-			np.random.normal(0, 1, [self.p, self.J])))
 
 		return Uk
 
@@ -760,12 +653,8 @@ class inversion(enka):
 
 			if   self.__update == 'eki':
 				U0 = self.eki_update(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
-			elif self.__update == 'eki-corrected':
-				U0 = self.eki_update_corrected(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 			elif self.__update == 'eki-flow':
 				U0 = self.eki_update_flow(y_obs, U0, Geval, Gamma, Jnoise, i, model = model, **kwargs)
-			elif self.__update == 'eki-jacobian':
-				U0 = self.eki_update_jacobian(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 
 			if save_online:
 				try:
