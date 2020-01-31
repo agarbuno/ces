@@ -447,25 +447,26 @@ class sampling(enka):
 		alpha_J = ((self.p + 1)/self.J)
 
 		# ------------------     Implicit prior term  --------------------------
-		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-			U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-			hk * alpha_J * (U0 - Umean))
+		# Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
+		# 	U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
+		# 	hk * alpha_J * (U0 - Umean))
+		# Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+		# 	np.random.normal(0, 1, [self.p, self.J])))
 
 		# ------------------     Implicit prior linear / term ------------------
 		# Ustar_ = np.linalg.solve( (1 - hk * alpha_J) * np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
 		# 	U0 - hk * np.matmul(U0 - Umean, D)  + \
 		# 	hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) - \
 		# 	hk * alpha_J * Umean)
-
-		Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-			np.random.normal(0, 1, [self.p, self.J])))
+		# Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+		# 	np.random.normal(0, 1, [self.p, self.J])))
 
 		# ------------------     Explicit as it can get ------------------------
-		# Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
-		# 	hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
-		# 	hk * alpha_J * (U0 - Umean) + \
-		# 	np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-		# 		np.random.normal(0, 1, [self.p, self.J]))
+		Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
+			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
+			hk * alpha_J * (U0 - Umean) + \
+			np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+				np.random.normal(0, 1, [self.p, self.J]))
 
 		return Uk
 
