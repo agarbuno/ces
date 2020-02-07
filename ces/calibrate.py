@@ -636,7 +636,7 @@ class sampling(enka):
 		elif kwargs.get('time_step') == 'constant':
 			hk = kwargs.get('delta_t', 0.2)
 		elif kwargs.get('time_step') == 'adaptive':
-			hk = kwargs.get('delta_t', 0.1)
+			hk = kwargs.get('delta_t', 0.05)
 			# hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
 
 		if len(self.Uall) == 1:
@@ -647,13 +647,13 @@ class sampling(enka):
 		return hk
 
 	def LM_procedure(self, Geval, y_obs, Gamma, Jnoise, **kwargs):
-		rho_LM = kwargs.get('rho_LM', .8)
+		rho_LM = kwargs.get('rho_LM', .5)
 
 		Cpp   = np.cov(Geval, bias = True)
 		Gmean = Geval.mean(axis = 1)
 
 		lower_LM = rho_LM * np.linalg.norm(np.linalg.solve(Jnoise, Gmean - y_obs[:,np.newaxis]))
-		alpha = 1.
+		alpha = 10.
 
 		upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
 
