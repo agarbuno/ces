@@ -337,8 +337,6 @@ class sampling(enka):
 				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-linear':
 				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs	)
-			elif self.__update == 'eks-jacobian-tempered':
-				U0 = self.eks_update_jac_temp(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-loo':
 				U0 = self.eks_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
 
@@ -440,16 +438,20 @@ class sampling(enka):
 		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		hk = self.timestep_method(D, Geval, y_obs, Gamma, [], **kwargs)
+		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
+		if kwargs.get('time_step', None) == 'adaptive':
+			Cpp = np.cov(Geval, bias = True)
+			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
 
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-		alpha_J = ((self.p + 1)/self.J)
+		alpha_J = ((self.p + 1.)/self.J)
 
 		# ------------------     Implicit prior term  --------------------------
 		# Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-		# 	U0 - hk * np.matmul(U0 - Umean, D)  + hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-		# 	hk * alpha_J * (U0 - Umean))
+		# 	U0 - hk * np.matmul(U0 - Umean, D)  + \
+		# 	hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
+		# 	1.0 * hk * alpha_J * (U0 - Umean))
 		# Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 		# 	np.random.normal(0, 1, [self.p, self.J])))
 
@@ -464,7 +466,7 @@ class sampling(enka):
 		# ------------------     Explicit as it can get ------------------------
 		Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
 			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
-			hk * alpha_J * (U0 - Umean) + \
+			1.0 * hk * alpha_J * (U0 - Umean) + \
 			np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 				np.random.normal(0, 1, [self.p, self.J]))
 
@@ -709,7 +711,7 @@ class inversion(enka):
 		if kwargs.get('time_step', None) is None:
 			hk = 1.
 		elif kwargs.get('time_step') == 'constant':
-			hk = 1./self.T
+			hk = kwargs.get('delta_t', 1./T)
 
 		# For ensemble update
 		eta   = np.random.normal(0, 1, [self.n_obs, self.J])
