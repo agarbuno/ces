@@ -336,7 +336,9 @@ class sampling(enka):
 			if   self.__update == 'eks':
 				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-linear':
-				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs	)
+				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs)
+			elif self.__update == 'eks-mix':
+				U0 = self.eks_update_mix(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-loo':
 				U0 = self.eks_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
 
@@ -472,6 +474,50 @@ class sampling(enka):
 
 		return Uk
 
+	def eks_update_mix(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		ALDI's linear correction.
+		"""
+		self.update_rule = 'eks_update_mix'
+		eta_p   = np.random.normal(0, 1, [self.p, self.J])
+		eta_d   = np.random.normal(0, 1, [self.n_obs, self.J])
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+
+		# Track metrics
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+
+		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
+		if kwargs.get('time_step', None) == 'adaptive':
+			Cpp = np.cov(Geval, bias = True)
+			Cup = (1./self.J) * np.matmul(U0 - Umean, E.T)
+			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
+
+		s_beta  = 1.0
+		s_alpha = 0.01
+		alpha_t = 1./(1.+np.exp(-(self.metrics['t'][-1] - s_beta)/s_alpha))
+		alpha_J = ((self.p + 1.)/self.J)
+
+		Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
+			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
+			hk * alpha_J * (U0 - Umean) + \
+			np.sqrt(2 * hk * alpha_t)   * np.matmul(np.linalg.cholesky(Ucov), eta_p) + \
+			np.sqrt(hk * (1 - alpha_t)) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma,
+				np.matmul(np.linalg.cholesky(Gamma), eta_d)
+				)
+			)
+
+		return Uk
+
 	def eks_update_loo(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
@@ -532,8 +578,8 @@ class sampling(enka):
 		elif kwargs.get('time_step') == 'constant':
 			hk = kwargs.get('delta_t', 0.2)
 		elif kwargs.get('time_step') == 'adaptive':
-			hk = kwargs.get('delta_t', 0.05)
-			# hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
+			# hk = kwargs.get('delta_t', 0.05)
+			hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
 
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
@@ -549,7 +595,7 @@ class sampling(enka):
 		Gmean = Geval.mean(axis = 1)
 
 		lower_LM = rho_LM * np.linalg.norm(np.linalg.solve(Jnoise, Gmean - y_obs[:,np.newaxis]))
-		alpha = 10.
+		alpha = 5.
 
 		upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
 
@@ -711,7 +757,7 @@ class inversion(enka):
 		if kwargs.get('time_step', None) is None:
 			hk = 1.
 		elif kwargs.get('time_step') == 'constant':
-			hk = kwargs.get('delta_t', 1./T)
+			hk = kwargs.get('delta_t', 1./self.T)
 
 		# For ensemble update
 		eta   = np.random.normal(0, 1, [self.n_obs, self.J])
@@ -736,13 +782,16 @@ class inversion(enka):
 		else:
 			self.metrics['t'].append(hk + self.metrics['t'][-1])
 
-		dU = - hk * np.matmul(U0 - Umean, D)
-		dW = np.sqrt(hk) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma,
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+
+		Uk = U0 - \
+			hk * np.matmul(U0 - Umean, D) + \
+			kwargs.get('prior', False) * hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
+			np.sqrt(hk) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma,
 				np.matmul(Jnoise, eta)
 				)
 			)
 
-		Uk = U0 + dU + dW
 
 		return Uk
 
