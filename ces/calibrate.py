@@ -407,7 +407,7 @@ class sampling(enka):
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
-		if kwargs.get('time_step', None) == 'adaptive':
+		if kwargs.get('time_step', None) in ['adaptive', 'constant']:
 			Cpp = np.cov(Geval, bias = True)
 			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
 
@@ -497,7 +497,7 @@ class sampling(enka):
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
-		if kwargs.get('time_step', None) == 'adaptive':
+		if kwargs.get('time_step', None) in ['adaptive', 'constant']:
 			Cpp = np.cov(Geval, bias = True)
 			Cup = (1./self.J) * np.matmul(U0 - Umean, E.T)
 			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
@@ -576,9 +576,8 @@ class sampling(enka):
 		elif kwargs.get('time_step') == 'norm':
 			hk = 1./(np.linalg.norm(D) + 1e-8)
 		elif kwargs.get('time_step') == 'constant':
-			hk = kwargs.get('delta_t', 0.2)
+			hk = kwargs.get('delta_t', 1./(self.T/2))
 		elif kwargs.get('time_step') == 'adaptive':
-			# hk = kwargs.get('delta_t', 0.05)
 			hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
 
 		if len(self.Uall) == 1:
