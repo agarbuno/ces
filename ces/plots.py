@@ -37,3 +37,9 @@ def plot_kde(x, y, ax, shade_lowest = False, alpha = .5, cmap = 'Blues'):
 				alpha = alpha, cmap = cmap,
 				n_levels = find_levels(x, y),
 				antialiased=True, normed=True, extend = 'both')
+
+def abline(slope, intercept, ax, **kwargs):
+    """Plot a line from slope and intercept"""
+    x_vals = np.array(ax.get_xlim())
+    y_vals = intercept + slope * x_vals
+    ax.plot(x_vals, y_vals, kwargs)

@@ -441,7 +441,8 @@ class sampling(enka):
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
-		if kwargs.get('time_step', None) == 'adaptive':
+		if kwargs.get('time_step', None) in ['adaptive', 'constant'] or \
+		  (kwargs.get('time_step', None) == 'mix' and self.metrics['t'][-1] > 1):
 			Cpp = np.cov(Geval, bias = True)
 			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
 
@@ -579,6 +580,12 @@ class sampling(enka):
 			hk = kwargs.get('delta_t', 1./(self.T/2))
 		elif kwargs.get('time_step') == 'adaptive':
 			hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
+		elif kwargs.get('time_step') == 'mix':
+			if len(self.metrics['t']) == 0 or self.metrics['t'][-1] < 1.:
+				self.radspec.append(np.linalg.eigvals(D).real.max())
+				hk = 1./self.radspec[-1]
+			else:
+				hk = kwargs.get('delta_t', 1./(self.T/2))
 
 		if len(self.Uall) == 1:
 			self.metrics['t'].append(hk)
