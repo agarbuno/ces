@@ -572,18 +572,17 @@ class sampling(enka):
 
 	def timestep_method(self, D, Geval, y_obs, Gamma, Jnoise, **kwargs):
 		if kwargs.get('time_step', None) is None:
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+		elif kwargs.get('time_step') == 'spectral':
 			self.radspec.append(np.linalg.eigvals(D).real.max())
 			hk = 1./self.radspec[-1]
-		elif kwargs.get('time_step') == 'norm':
-			hk = 1./(np.linalg.norm(D) + 1e-8)
 		elif kwargs.get('time_step') == 'constant':
 			hk = kwargs.get('delta_t', 1./(self.T/2))
 		elif kwargs.get('time_step') == 'adaptive':
 			hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
 		elif kwargs.get('time_step') == 'mix':
-			if len(self.metrics['t']) == 0 or self.metrics['t'][-1] < 1.:
-				self.radspec.append(np.linalg.eigvals(D).real.max())
-				hk = 1./self.radspec[-1]
+			if len(self.metrics['t']) == 0 or self.metrics['t'][-1] < 4.:
+				hk = 1./(np.linalg.norm(D) + 1e-8)
 			else:
 				hk = kwargs.get('delta_t', 1./(self.T/2))
 
