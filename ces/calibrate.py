@@ -394,6 +394,8 @@ class sampling(enka):
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
 		self.update_rule = 'eks_update'
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0, bias = True) + 1e-8 * np.identity(self.p)
 
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -406,13 +408,10 @@ class sampling(enka):
 		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
-		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
+		hk = self.timestep_method(D, Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
 		if kwargs.get('time_step', None) in ['adaptive', 'constant']:
 			Cpp = np.cov(Geval, bias = True)
 			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
-
-		Umean = U0.mean(axis = 1)[:, np.newaxis]
-		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
 
 		Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
 			U0 - hk * np.matmul(U0 - Umean, D)  + \
@@ -573,6 +572,8 @@ class sampling(enka):
 	def timestep_method(self, D, Geval, y_obs, Gamma, Jnoise, **kwargs):
 		if kwargs.get('time_step', None) is None:
 			hk = 1./(np.linalg.norm(D) + 1e-8)
+			# self.radspec.append(np.linalg.eigvals(D).real.max())
+			# hk = 1./self.radspec[-1]
 		elif kwargs.get('time_step') == 'spectral':
 			self.radspec.append(np.linalg.eigvals(D).real.max())
 			hk = 1./self.radspec[-1]
