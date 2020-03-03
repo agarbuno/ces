@@ -468,7 +468,7 @@ class sampling(enka):
 		# ------------------     Explicit as it can get ------------------------
 		Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
 			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
-			1.0 * hk * alpha_J * (U0 - Umean) + \
+			hk * alpha_J * (U0 - Umean) + \
 			np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 				np.random.normal(0, 1, [self.p, self.J]))
 
