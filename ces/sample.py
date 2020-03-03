@@ -124,6 +124,9 @@ class MCMC(object):
 		else:
 			scales = delta * np.eye(enka.p)
 
+		if kwargs.get('update', None) == 'pCN':
+			scales = np.linalg.cholesky(prior.cov)
+
 		current = enka.Ustar.mean(axis = 1)
 		if model.type == 'pde':
 			w_mcmc  = np.copy(model.wt)
@@ -134,7 +137,10 @@ class MCMC(object):
 
 		yg = g[:enka.n_obs] - self.y_obs
 		phi_current = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
-		phi_current -= prior.logpdf(current.flatten())
+		if kwargs.get('update', None) == 'pCN':
+			pass
+		else:
+			phi_current -= prior.logpdf(current.flatten())
 		# try:
 		# 	phi_current -= model.logjacobian(current.flatten())
 		# 	tqdm.write(str(model.logjacobian(current.flatten())))
@@ -165,7 +171,10 @@ class MCMC(object):
 
 			yg = g_proposal[:enka.n_obs] - self.y_obs
 			phi_proposal  = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
-			phi_proposal -= prior.logpdf(proposal.flatten())
+			if kwargs.get('update', None) == 'pCN':
+				pass
+			else:
+				phi_proposal -= prior.logpdf(proposal.flatten())
 			# try:
 			# 	phi_proposal -= model.logjacobian(proposal.flatten())
 			# except AttributeError:
