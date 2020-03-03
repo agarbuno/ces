@@ -119,11 +119,12 @@ class MCMC(object):
 		self.accept  = accept/n_mcmc
 
 	def model_mh(self, model, n_mcmc, prior, enka, Gamma, delta = 1., enka_scaling = True, **kwargs):
+		# RW needs the proposal distribution.
 		if enka_scaling:
 			scales = delta * np.linalg.cholesky(np.cov(enka.Ustar).reshape(enka.p, enka.p))
 		else:
 			scales = delta * np.eye(enka.p)
-
+		# pCN needs proposes according to the prior
 		if kwargs.get('update', None) == 'pCN':
 			scales = np.linalg.cholesky(prior.cov)
 
@@ -138,9 +139,13 @@ class MCMC(object):
 		yg = g[:enka.n_obs] - self.y_obs
 		phi_current = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
 		if kwargs.get('update', None) == 'pCN':
+			# Don't take into account the prior as the pCN is prior invariant.
 			pass
 		else:
+			# For other MCMC approaches you need to take into account the
+			# prior distribution in the MH ratio.
 			phi_current -= prior.logpdf(current.flatten())
+
 		# try:
 		# 	phi_current -= model.logjacobian(current.flatten())
 		# 	tqdm.write(str(model.logjacobian(current.flatten())))
