@@ -384,10 +384,10 @@ class sampling(enka):
 		try:
 			getattr(self, 'nexp')
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
-					'-eks-' + str(self.J).zfill(4)+ '-' + str(self.nexp).zfill(2)+'/'
+					'-' + str(self.J).zfill(4)+ '-' + str(self.nexp).zfill(2)+'/'
 		except AttributeError:
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
-					'-eks-' + str(self.J).zfill(4)+ '/'
+					'-' + str(self.J).zfill(4)+ '/'
 
 	def eks_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
@@ -750,10 +750,10 @@ class inversion(enka):
 		try:
 			getattr(self, 'nexp')
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
-					'-eki-' + str(self.J).zfill(4)+ '-' + str(self.nexp).zfill(2)+'/'
+					'-' + str(self.J).zfill(4)+ '-' + str(self.nexp).zfill(2)+'/'
 		except AttributeError:
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
-					'-eki-' + str(self.J).zfill(4)+ '/'
+					'-' + str(self.J).zfill(4)+ '/'
 
 
 	def eki_update(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
