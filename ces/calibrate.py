@@ -337,6 +337,8 @@ class sampling(enka):
 				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-linear':
 				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs)
+			elif self.__update == 'aldi':
+				U0 = self.eks_update_linear_reich(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-mix':
 				U0 = self.eks_update_mix(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-loo':
@@ -447,6 +449,10 @@ class sampling(enka):
 
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+		try:
+			np.linalg.cholesky(Ucov)
+		except:
+			print(self.metrics['t'][-1])
 		alpha_J = ((self.p + 1.)/self.J)
 
 		# ------------------     Implicit prior term  --------------------------
@@ -469,6 +475,44 @@ class sampling(enka):
 		Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
 			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
 			hk * alpha_J * (U0 - Umean) + \
+			np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
+				np.random.normal(0, 1, [self.p, self.J]))
+
+		return Uk
+
+	def eks_update_linear_reich(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+		"""
+		Ensemble update based on the continuous time limit of the EKS.
+		ALDI's linear correction.
+		"""
+		self.update_rule = 'eks_update_aldi'
+
+		# For ensemble update
+		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
+		R = Geval - y_obs[:,np.newaxis]
+		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
+
+		# Track metrics
+		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
+		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
+		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
+		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
+
+		Umean = U0.mean(axis = 1)[:, np.newaxis]
+		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
+		alpha_J = ((self.p + 1.)/self.J)
+
+		drift = - np.matmul(U0 - Umean, D) - \
+			np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
+			alpha_J * (U0 - Umean);
+
+		hk = 0.1/np.max(np.abs(drift));
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+
+		Uk = U0 + hk * drift + \
 			np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
 				np.random.normal(0, 1, [self.p, self.J]))
 

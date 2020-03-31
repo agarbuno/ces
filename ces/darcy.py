@@ -81,10 +81,7 @@ class model_trunc(model):
 		Outputs:
 			- y: (n_obs,) array of observations at obs_index.
 		"""
-		xi = np.zeros(int(self.Nmesh * self.Nmesh))
-		xi[self.rank[:self.p]] = np.copy(xi_red)
-
-		theta = self.eval_rf(xi)
+		theta = self.eval_rf(xi_red)
 		U     = self.solve_pde(theta)
 		if full_solution:
 			return np.asarray(U).flatten()
@@ -103,4 +100,6 @@ class model_trunc(model):
 		Outputs:
 			- theta: log Gaussian random field.
 		"""
-		return self.eng.gaussrnd_coarse(matlab.double(xi.reshape(int(self.Nmesh), -1).tolist()), self.alpha, self.tau, self.Nmesh)
+		xi__ = np.zeros(int(self.Nmesh * self.Nmesh))
+		xi__[self.rank[:self.p]] = np.copy(xi)
+		return self.eng.gaussrnd_coarse(matlab.double(xi__.reshape(int(self.Nmesh), -1).tolist()), self.alpha, self.tau, self.Nmesh)
