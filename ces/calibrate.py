@@ -504,7 +504,7 @@ class sampling(enka):
 
 		drift = - np.matmul(U0 - Umean, D) - \
 			np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
-			alpha_J * (U0 - Umean);
+			kwargs.get('switch', 1.) * alpha_J * (U0 - Umean);
 
 		hk = 0.1/np.max(np.abs(drift));
 		if len(self.Uall) == 1:
