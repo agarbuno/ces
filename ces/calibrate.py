@@ -85,29 +85,32 @@ class EnsembleKalmanMethod:
 		"""
 		pass
 
-	def G(self, theta, model):
+	def forward_model(self, theta, model):
 		"""
 		General evaluation function without partition of the model parameters.
 		To be used as a black box. It evaluates a single case.
 		Inputs:
 			- theta: [p, ] dimensional array
 			- model: forward map name
+
+		Output:
+			- G(theta)
 		"""
 		g = model(theta)
 		return g
 
-	def G_ens(self, theta, model):
+	def ensemble_forward_model(self, theta, model):
 		"""
-		Evaluates for a collection of particles. If parallel is set to true, then
-		it uses the available cores as initialized within the EnsembleKalmanMethod
-		object.
+		Evaluates the forward model for a collection of particles. If parallel is set to
+		true, then it uses the available cores as initialized within the
+		`EnsembleKalmanMethod` object.
 		Inputs:
 			- theta: [p, N] array where N is the number of particles to be evaluated
 				and p is the dimensionality of the parameters.
 			- model: model name for the forward model.
 		"""
 		if self.parallel:
-			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G)(k, model) for k in tqdm(theta.T,
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.forward_model)(k, model) for k in tqdm(theta.T,
 				desc = 'Model evaluations: ',
 				disable = self.mute_bar,
 				leave = False,
@@ -120,10 +123,10 @@ class EnsembleKalmanMethod:
 					disable = self.mute_bar,
 					leave = True,
 					position = 1):
-				Gs[:, ii] = model(k)
+				Gs[:, ii] = self.forward_model(k)
 			return Gs
 
-	def G_pde(self, k, model, t):
+	def forward_solve(self, k, model, t):
 		"""
 		Forward model for PDE constrained inverse problems. If parallel is set to
 		true, then it uses the available cores as initialized with the enka object.
@@ -147,9 +150,9 @@ class EnsembleKalmanMethod:
 		gs = model.statistics(ws)
 		return np.concatenate([gs, ws[-1]])
 
-	def G_pde_ens(self, theta, model, t):
+	def ensemble_forward_solve(self, theta, model, t):
 		if self.parallel:
-			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.G_pde)(k, model, t) for k in tqdm(theta.T,
+			Geval = Parallel(n_jobs=self.num_cores)(delayed(self.forward_solve)(k, model, t) for k in tqdm(theta.T,
 					desc = 'Model evaluations: ',
 					disable = self.mute_bar,
 					leave = False,
@@ -158,7 +161,7 @@ class EnsembleKalmanMethod:
 		else:
 			Gs = np.zeros((self.n_obs + model.n_state, theta.shape[1]))
 			for ii, k in enumerate(theta.T):
-				Gs[:, ii] = self.G_pde(k, model, t)
+				Gs[:, ii] = self.forward_solve(k, model, t)
 			return Gs
 
 	def save(self, path = './', file = 'ces/', all = False, reset = True, online = False, counter = 0):
@@ -306,7 +309,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 
 		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
 			if model.type == 'pde':
-				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+				Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
 				if kwargs.get('update_wt', True):
 					if kwargs.get('ws', None) is not None:
 						widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
@@ -315,7 +318,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 					else:
 						self.W0 = np.copy(Geval[self.n_obs:,:])
 			elif model.type == 'map':
-				Geval = self.G_ens(U0, model)
+				Geval = self.ensemble_forward_model(U0, model)
 			else:
 				break # Raise an error
 
@@ -356,14 +359,14 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 				break
 
 		if model.type == 'pde':
-			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+			Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
 			if kwargs.get('update_wt', True):
 				if kwargs.get('ws', None) is not None:
 					self.W0 = kwargs.get('ws')[np.random.randint(kwargs.get('ws').shape[0], size = self.J)].T
 				else:
 					self.W0 = Geval[self.n_obs:,:]
 		elif model.type == 'map':
-			Geval = self.G_ens(U0, model)
+			Geval = self.ensemble_forward_model(U0, model)
 
 		if trace:
 			self.Uall.append(U0)
@@ -723,7 +726,7 @@ class EnsembleKalmanInversion(EnsembleKalmanMethod):
 
 		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
 			if model.type == 'pde':
-				Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+				Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
 				if kwargs.get('update_wt', True):
 					if kwargs.get('ws', None) is not None:
 						widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
@@ -732,7 +735,7 @@ class EnsembleKalmanInversion(EnsembleKalmanMethod):
 					else:
 						self.W0 = np.copy(Geval[self.n_obs:,:])
 			elif model.type == 'map':
-				Geval = self.G_ens(U0, model)
+				Geval = self.ensemble_forward_model(U0, model)
 			else:
 				break # Raise an error
 
@@ -764,14 +767,14 @@ class EnsembleKalmanInversion(EnsembleKalmanMethod):
 							  online = True, counter = i)
 
 		if model.type == 'pde':
-			Geval = self.G_pde_ens(np.vstack([U0, self.W0]), model, t)
+			Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
 			if kwargs.get('update_wt', True):
 				if kwargs.get('ws', None) is not None:
 					self.W0 = kwargs.get('ws')[np.random.randint(kwargs.get('ws').shape[0], size = self.J)].T
 				else:
 					self.W0 = Geval[self.n_obs:,:]
 		elif model.type == 'map':
-			Geval = self.G_ens(U0, model)
+			Geval = self.ensemble_forward_model(U0, model)
 
 		if trace:
 			self.Uall.append(U0)
