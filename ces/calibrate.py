@@ -3,15 +3,13 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
-# import gpflow as gp
 
-# from tqdm import tqdm
 from tqdm.autonotebook import tqdm
 from scipy import integrate
 from joblib import Parallel, delayed
 import multiprocessing
 
-class enka(object):
+class EnsembleKalmanMethod(object):
 
 	def __init__(self, p, n_obs, J):
 		self.n_obs     = n_obs        # Dimensionality of statistics (observations)
@@ -22,12 +20,6 @@ class enka(object):
 		self.num_cores = multiprocessing.cpu_count()
 		self.parallel  = False
 		self.mute_bar  = True
-
-	def __repr__(self):
-		try:
-			return 'enka' + '-' + str(self.J).zfill(4) + '-%s'%getattr(self.__update)
-		except AttributeError:
-			return 'enka' + '-' + str(self.J).zfill(4) + '-eks'
 
 	def __str__(self):
 		print(r'Number of parameters ................. %s'%(self.p))
@@ -51,8 +43,8 @@ class enka(object):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF.
+		Apply Ensemble Kalman Method to solve a static inverse problem.
+			y = G(theta) + eta.
 
 		Inputs:
 		- U0: A numpy array of shape (p, J) initial ensemble; there are J
@@ -70,8 +62,6 @@ class enka(object):
 
 	def run_sde(self, y_obs, U0, model, Gamma, Jnoise):
 		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EnKF
 
 		Inputs:
 		- U0: A numpy array of shape (p, J) initial ensemble; there are J
@@ -88,16 +78,16 @@ class enka(object):
 		"""
 		pass
 
-	def eks_update(self, Geval):
+	def ensemble_update(self, Geval):
 		"""
-		Perform a single step update of the EKS algorithm.
+		Perform a single step update for the ensemble
 		"""
 		pass
 
 	def G(self, theta, model):
 		"""
 		General evaluation function without partition of the model parameters.
-		To be used as a black box. It evaluates single case.
+		To be used as a black box. It evaluates a single case.
 		Inputs:
 			- theta: [p, ] dimensional array
 			- model: forward map name
@@ -108,7 +98,8 @@ class enka(object):
 	def G_ens(self, theta, model):
 		"""
 		Evaluates for a collection of particles. If parallel is set to true, then
-		it uses the available cores as initialized with the enka object.
+		it uses the available cores as initialized within the EnsembleKalmanMethod
+		object.
 		Inputs:
 			- theta: [p, N] array where N is the number of particles to be evaluated
 				and p is the dimensionality of the parameters.
@@ -240,7 +231,7 @@ class enka(object):
 
 # ------------------------------------------------------------------------------
 
-class sampling(enka):
+class EnsembleKalmanSampler(EnsembleKalmanMethod):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
@@ -334,15 +325,15 @@ class sampling(enka):
 			Geval = Geval[:self.n_obs,:]
 
 			if   self.__update == 'eks':
-				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.ensemble_update(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-linear':
-				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.ensemble_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'aldi':
-				U0 = self.eks_update_linear_reich(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.ensemble_update_linear_reich(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-mix':
-				U0 = self.eks_update_mix(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.ensemble_update_mix(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'eks-loo':
-				U0 = self.eks_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.ensemble_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
 
 			if save_online:
 				try:
@@ -391,11 +382,11 @@ class sampling(enka):
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
 					'-' + str(self.J).zfill(4)+ '/'
 
-	def eks_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+	def ensemble_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		"""
-		self.update_rule = 'eks_update'
+		self.update_rule = 'ensemble_update'
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
 		Ucov  = np.cov(U0, bias = True) + 1e-8 * np.identity(self.p)
 
@@ -423,12 +414,12 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_linear(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+	def ensemble_update_linear(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		ALDI's linear correction.
 		"""
-		self.update_rule = 'eks_update_linear'
+		self.update_rule = 'ensemble_update_linear'
 
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -480,12 +471,12 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_linear_reich(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+	def ensemble_update_linear_reich(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		ALDI's linear correction.
 		"""
-		self.update_rule = 'eks_update_aldi'
+		self.update_rule = 'ensemble_update_aldi'
 
 		# For ensemble update
 		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
@@ -518,12 +509,12 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_mix(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+	def ensemble_update_mix(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		ALDI's linear correction.
 		"""
-		self.update_rule = 'eks_update_mix'
+		self.update_rule = 'ensemble_update_mix'
 		eta_p   = np.random.normal(0, 1, [self.p, self.J])
 		eta_d   = np.random.normal(0, 1, [self.n_obs, self.J])
 		Umean = U0.mean(axis = 1)[:, np.newaxis]
@@ -562,7 +553,7 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_loo(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+	def ensemble_update_loo(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		LOO: Leave-One-Out
@@ -657,7 +648,7 @@ class sampling(enka):
 
 # ------------------------------------------------------------------------------
 
-class inversion(enka):
+class EnsembleKalmanInversion(EnsembleKalmanMethod):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
@@ -751,9 +742,9 @@ class inversion(enka):
 			Geval = Geval[:self.n_obs,:]
 
 			if   self.__update == 'eki':
-				U0 = self.eki_update(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
+				U0 = self.ensemble_update(y_obs, U0, Geval, Gamma, Jnoise, i, **kwargs)
 			elif self.__update == 'eki-flow':
-				U0 = self.eki_update_flow(y_obs, U0, Geval, Gamma, Jnoise, i, model = model, **kwargs)
+				U0 = self.ensemble_update_flow(y_obs, U0, Geval, Gamma, Jnoise, i, model = model, **kwargs)
 
 			if save_online:
 				try:
@@ -800,7 +791,7 @@ class inversion(enka):
 					'-' + str(self.J).zfill(4)+ '/'
 
 
-	def eki_update(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
+	def ensemble_update(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKI.
 		"""
@@ -845,7 +836,7 @@ class inversion(enka):
 
 		return Uk
 
-	def eki_update_flow(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
+	def ensemble_update_flow(self, y_obs, U0, Geval, Gamma, Jnoise, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKI.
 		"""
