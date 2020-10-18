@@ -73,7 +73,6 @@ class EnsembleKalmanMethod:
 		- t: A numpy array of time points where the ODE is evaluated
 		- ...
 
-
 		Outputs:
 		- None
 		"""
@@ -87,8 +86,8 @@ class EnsembleKalmanMethod:
 
 	def forward_model(self, theta, model):
 		"""
-		General evaluation function without partition of the model parameters.
-		To be used as a black box. It evaluates a single case.
+		General evaluation function. To be used as a black box.
+		It evaluates a single case.
 		Inputs:
 			- theta: [p, ] dimensional array
 			- model: forward map name
@@ -96,13 +95,13 @@ class EnsembleKalmanMethod:
 		Output:
 			- G(theta)
 		"""
-		g = model(theta)
-		return g
+		G = model(theta)
+		return G
 
 	def ensemble_forward_model(self, theta, model):
 		"""
-		Evaluates the forward model for a collection of particles. If parallel is set to
-		true, then it uses the available cores as initialized within the
+		Evaluates the forward model for a collection of particles. If parallel
+		is set to true, then it uses the available cores as initialized within the
 		`EnsembleKalmanMethod` object.
 		Inputs:
 			- theta: [p, N] array where N is the number of particles to be evaluated
@@ -239,39 +238,45 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
-		Find the minimizer of an inverse problem using the continuous time limit
-		of the EKnF. The update can selected from a range of options.
+		Run the Ensemble Kalman Sampler as described in:
+			https://arxiv.org/pdf/1903.08866.pdf
 
 		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
+		- U0: np.array [p, J] initial ensemble; there are J
 			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
+		- y_obs: np.arrray [n_obs,] of observed data.
 		- model: Forward model to be used. Currently for two types of problems.
-			- 'pde' : pde / ode constrained forward models.
+			- 'pde' : pde/ode constrained forward models.
 			- 'map' : input output functions.
-		- Gamma: Noise covariance structure. Shape has to be (n_obs, n_obs)
-		- Jnoise: Precomputed cholesky decomposition of Gamma.
+		- Gamma: Noise covariance structure. np.array [n_obs, n_obs]
+		- Jnoise: Pre-computed cholesky decomposition of Gamma.
 
-		Optional (pde model type only):
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
+		Optional (**pde model type only**):
+		- wt: np.array of initial conditions to start the ensemble when
+			evaluating the forward model.
+		- t:  np.array of time points where the pde/ode is evaluated.
 
 		Outputs:
-		- None
+		- None: all relevant objects are stored within the object.
+
 		"""
+
+		# Check type of model evaluation
 		try:
 			getattr(model, 'type')
 		except AttributeError:
 			raise
 
+		# Check for directory to save ensemble
 		try:
 			getattr(self, 'directory')
 		except AttributeError:
 			self.directory = os.getcwd()
 
+		# Type of update to be used
 		self.__update = kwargs.get('update', 'eks')
 
+		# For ensemble tracking purposes
 		if trace:
 			try:
 				getattr(self, 'Uall')
@@ -283,6 +288,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 				self.Uall = [];
 				self.Gall = [];
 
+		# Setting for pde type inverse problems
 		if model.type == 'pde':
 			wt = kwargs.get('wt', None)
 			t  = kwargs.get('t', None)
@@ -295,6 +301,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 			else:
 				self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
 
+		# For metric tracking purposes.
 		try :
 			getattr(self, 'metrics')
 		except AttributeError:
@@ -307,6 +314,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 			self.metrics['bias'] = []			# Tracks the collapse towards the truth
 			self.metrics['t'] = []
 
+		# Evolving the ensemble
 		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
 			if model.type == 'pde':
 				Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
@@ -358,6 +366,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 			if self.metrics['t'][-1] > kwargs.get('t_tol', 2.):
 				break
 
+		# Evaluating at the final iteration
 		if model.type == 'pde':
 			Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
 			if kwargs.get('update_wt', True):
@@ -368,6 +377,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 		elif model.type == 'map':
 			Geval = self.ensemble_forward_model(U0, model)
 
+		# Updating ensemble tracking information.
 		if trace:
 			self.Uall.append(U0)
 			self.Gall.append(Geval);
@@ -378,6 +388,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 		self.Ustar = U0
 		self.Gstar = Geval[:self.n_obs,:]
 
+		# File-storing ensemble instructions.
 		try:
 			getattr(self, 'nexp')
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
