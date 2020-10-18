@@ -9,7 +9,7 @@ from scipy import integrate
 from joblib import Parallel, delayed
 import multiprocessing
 
-class EnsembleKalmanMethod(object):
+class EnsembleKalmanMethod:
 
 	def __init__(self, p, n_obs, J):
 		self.n_obs     = n_obs        # Dimensionality of statistics (observations)
@@ -25,7 +25,7 @@ class EnsembleKalmanMethod(object):
 		print(r'Number of parameters ................. %s'%(self.p))
 		print(r'Dimension of forward model output .... %s'%(self.n_obs))
 		print(r'Ensemble size ........................ %s'%(self.J))
-		print(r'Evaluate G in parallel ............... %s'%(self.parallel))
+		print(r'Parallel evaluation  ................. %s'%(self.parallel))
 		print(r'Number of iterations to be run ....... %s'%(self.T))
 
 		try:
@@ -35,9 +35,10 @@ class EnsembleKalmanMethod(object):
 		print('Path to save: ......................... %s'%('~/.../'+'/'.join(self.directory.split('/')[-2:])))
 
 		try:
-			print(r'Number of iterations EKS has run ..... %s'%(len(self.Uall) - 1))
+			__iterations = len(self.Uall) - 1
 		except AttributeError:
-			print(r'NOTE: EKS has not been run!')
+			__iterations = 0
+		print(r'Number of iterations EKS has run ..... %s'%(__iterations))
 
 		return str()
 
@@ -124,7 +125,7 @@ class EnsembleKalmanMethod(object):
 
 	def G_pde(self, k, model, t):
 		"""
-		Forward model for PDE constrained inverse problem. If parallel is set to
+		Forward model for PDE constrained inverse problems. If parallel is set to
 		true, then it uses the available cores as initialized with the enka object.
 		(WARNING): Hope to be more general now!
 
