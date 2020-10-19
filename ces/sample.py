@@ -131,10 +131,10 @@ class MCMC(object):
 		current = enka.Ustar.mean(axis = 1)
 		if model.type == 'pde':
 			w_mcmc  = np.copy(model.wt)
-			g = enka.G_pde(np.hstack([current.flatten(), w_mcmc]), model, model.t)
+			g = enka.forward_solve(np.hstack([current.flatten(), w_mcmc]), model, model.t)
 			# w_mcmc = np.copy(g[enka.n_obs:])
 		else:
-			g = enka.G(current.flatten(), model)
+			g = enka.forward_model(current.flatten(), model)
 
 		yg = g[:enka.n_obs] - self.y_obs
 		phi_current = (yg * np.linalg.solve(2 * Gamma, yg)).sum()
@@ -169,10 +169,10 @@ class MCMC(object):
 				proposal = self.pCN(current, scales, enka.p, beta = kwargs.get('beta', 0.5))
 
 			if model.type == 'pde':
-				g_proposal =  enka.G_pde(np.hstack([proposal.flatten(), w_mcmc]), model, model.t)
+				g_proposal =  enka.forward_solve(np.hstack([proposal.flatten(), w_mcmc]), model, model.t)
 				# w_mcmc = np.copy(g_proposal[enka.n_obs:])
 			else:
-				g_proposal =  enka.G(proposal.flatten(), model)
+				g_proposal =  enka.forward_model(proposal.flatten(), model)
 
 			yg = g_proposal[:enka.n_obs] - self.y_obs
 			phi_proposal  = (yg * np.linalg.solve(2 * Gamma, yg)).sum()

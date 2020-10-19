@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy import integrate
 
-class lineal(object):
+class Lineal:
 	"""
 	"""
 	def __init__(self, A, flag_noise = False):
@@ -29,7 +29,7 @@ class lineal(object):
 		else:
 			return np.matmul(self.A, theta)
 
-class lineal_log(lineal):
+class LinealLog(Lineal):
 	def __init__(self, A, flag_noise = False):
 		super().__init__(A, flag_noise = flag_noise)
 		self.model_name        = 'lineal_log'
@@ -49,7 +49,7 @@ class lineal_log(lineal):
 		else:
 			return 0.0
 
-class elliptic(object):
+class Elliptic:
 	"""
 	"""
 	def __init__(self, flag_noise = False):
@@ -82,7 +82,7 @@ class elliptic(object):
 		else:
 			return [x,y]
 
-class banana(object):
+class Banana:
 	"""
 	"""
 	def __init__(self, a = 1.0, b = .5, rho = .9, flag_noise = False):
@@ -115,7 +115,7 @@ class banana(object):
 		y = u2/self.a - self.b *(u1**2 + self.a**2)
 		return np.array([x, y]) + self.flag_noise * np.linalg.cholesky(self.Gamma).dot(np.random.normal(0, 1, [2,]))
 
-class lorenz63(object):
+class Lorenz63:
 	"""
 	Lorenz 63 model. PDE model structure:
 		- init: to initialize the object
@@ -187,7 +187,7 @@ class lorenz63(object):
 			int(self.l_window * self.freq)).mean(axis = 2)[:,-1]
 		return gs
 
-class lorenz63_log(lorenz63):
+class Lorenz63Log(Lorenz63):
 	def __init__(self, l_window = 10, freq = 100):
 		super().__init__(l_window = l_window, freq = freq)
 		self.model_name = 'lorenz63_log'
@@ -220,7 +220,7 @@ class lorenz63_log(lorenz63):
 	def logjacobian(self, params):
 			return - params.sum(axis = 0)
 
-class lorenz96(object):
+class Lorenz96:
 	"""
 	Lorenz 96 model. PDE model structure:
 		- init: to initialize the object
@@ -341,7 +341,7 @@ class lorenz96(object):
 
 		return gradlogjac
 
-class lorenz96_hom(lorenz96):
+class Lorenz96Hom(Lorenz96):
 	def __init__(self):
 		super().__init__()
 		self.hom = True
@@ -361,7 +361,7 @@ class lorenz96_hom(lorenz96):
 		else:
 			return Phi[:,-1].reshape(5, -1)[:, 7]
 
-class lorenz96Fc(lorenz96):
+class Lorenz96FC(Lorenz96):
 	def __init__(self):
 		super().__init__()
 
@@ -383,7 +383,7 @@ class lorenz96Fc(lorenz96):
 		ws = self.model(w, t, 1., F, log_c, 10.)
 		return ws
 
-class lorenz96Fb(lorenz96):
+class Lorenz96FB(Lorenz96):
 	def __repr__(self):
 		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(2)
 
@@ -402,7 +402,7 @@ class lorenz96Fb(lorenz96):
 		ws = self.model(w, t, 1., F, np.log(10), b)
 		return ws
 
-class lorenz96hFb(lorenz96):
+class Lorenz96HFB(Lorenz96):
 	def __repr__(self):
 		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(3)
 
@@ -421,7 +421,7 @@ class lorenz96hFb(lorenz96):
 		ws = self.model(w, t, h, F, np.log(10), b)
 		return ws
 
-class lorenz96hcb(lorenz96):
+class Lorenz96HCB(Lorenz96):
 	def __repr__(self):
 		return self.model_name + ',' + str(self.n_slow) + ',' + str(self.n_fast) + ',' + str(3)
 
