@@ -61,23 +61,6 @@ class EnsembleKalmanMethod:
 		"""
 		pass
 
-	def run_sde(self, y_obs, U0, model, Gamma, Jnoise):
-		"""
-
-		Inputs:
-		- U0: A numpy array of shape (p, J) initial ensemble; there are J
-			ensemble particles each of dimension p.
-		- y_obs: A numpy array of shape (n_obs,) of observed data.
-		- wt: A numpy array of initial conditions to start the ensemble when
-			evaluating the forward model
-		- t: A numpy array of time points where the ODE is evaluated
-		- ...
-
-		Outputs:
-		- None
-		"""
-		pass
-
 	def ensemble_update(self, Geval):
 		"""
 		Perform a single step update for the ensemble
@@ -125,6 +108,21 @@ class EnsembleKalmanMethod:
 				Gs[:, ii] = self.forward_model(k)
 			return Gs
 
+	def choose_initial_conditions(self, model, **kwargs):
+		self.wt = kwargs.get('wt', None)
+		self.t  = kwargs.get('t', None)
+		if kwargs.get('ws', None) is not None:
+			# Receives a history of initial conditions
+			widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
+			self.W0 = kwargs.get('ws')[widx].T
+
+			self.Wall = [];
+			self.Wall.append(widx)
+
+		else:
+			# Receives a state for initial conditions
+			self.W0 = np.tile(self.wt, self.J).reshape(self.J, model.n_state).T
+
 	def forward_solve(self, k, model, t):
 		"""
 		Forward model for PDE constrained inverse problems. If parallel is set to
@@ -162,6 +160,23 @@ class EnsembleKalmanMethod:
 			for ii, k in enumerate(theta.T):
 				Gs[:, ii] = self.forward_solve(k, model, t)
 			return Gs
+
+	def evaluate_ensemble_master(self, U0, model, **kwargs):
+		# Evaluate the forward model / solver
+		if model.type == 'pde':
+			Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, self.t)
+			if kwargs.get('update_wt', True):
+				if kwargs.get('ws', None) is not None:
+					widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
+					self.Wall.append(widx)
+					self.W0 = kwargs.get('ws')[widx].T
+				else:
+					self.W0 = np.copy(Geval[self.n_obs:,:])
+		elif model.type == 'map':
+			Geval = self.ensemble_forward_model(U0, model)
+
+		return Geval
+
 
 	def save(self, path = './', file = 'ces/', all = False, reset = True, online = False, counter = 0):
 		"""
@@ -232,9 +247,51 @@ class EnsembleKalmanMethod:
 
 		return True
 
+	def update_save_directory(self, **kwargs):
+		try:
+			getattr(self, 'directory')
+		except AttributeError:
+			self.directory = os.getcwd()
+
+	def ensemble_save_online(self, model, iteration, **kwargs):
+		try:
+			getattr(self, 'nexp')
+			self.save(path = self.directory+'/ensembles/',
+					  file = model.model_name + '-eks-' + \
+					  			str(model.l_window).zfill(3)+ '-' + \
+								str(self.J).zfill(4)+ '-' + \
+								str(self.nexp).zfill(2) + '/',
+					  online = True, counter = iteration)
+		except AttributeError:
+			self.save(path = self.directory+'/ensembles/',
+					  file = model.model_name + '-eks-' + \
+					  			str(model.l_window).zfill(3)+ '-' + \
+								str(self.J).zfill(4) + '/',
+					  online = True, counter = iteration)
+
 # ------------------------------------------------------------------------------
 
 class EnsembleKalmanSampler(EnsembleKalmanMethod):
+
+	def __init__(self, p, n_obs, J, track_ensemble = True,
+									track_metrics  = True):
+		super().__init__(p, n_obs, J)
+		self.update_save_directory()
+		self.track_ensemble = track_ensemble
+		self.track_metrics  = track_metrics
+
+		if self.track_ensemble:
+			self.Uall = [];
+			self.Gall = [];
+
+		if self.track_metrics:
+			self.radspec = []
+			self.metrics = dict()
+			self.metrics['self-bias'] = []			# Tracks collapse in parameter space
+			self.metrics['self-bias-data'] = []			# Tracks collapse after forward model evaln
+			self.metrics['bias-data'] = []			# Tracks data-fitting
+			self.metrics['bias'] = []			# Tracks the collapse towards the truth
+			self.metrics['t'] = []
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
@@ -268,117 +325,41 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 			raise
 
 		# Check for directory to save ensemble
-		try:
-			getattr(self, 'directory')
-		except AttributeError:
-			self.directory = os.getcwd()
+		self.update_save_directory(**kwargs)
 
 		# Type of update to be used
 		self.__update = kwargs.get('update', 'eks')
 
-		# For ensemble tracking purposes
-		if trace:
-			try:
-				getattr(self, 'Uall')
-				self.Uall = list(self.Uall)
-				self.Gall = list(self.Gall)
-
-			except AttributeError:
-				# Storing the ensemble members
-				self.Uall = [];
-				self.Gall = [];
-
-		# Setting for pde type inverse problems
+		# Setting for pde-type inverse problems
 		if model.type == 'pde':
-			wt = kwargs.get('wt', None)
-			t  = kwargs.get('t', None)
-			if kwargs.get('ws', None) is not None:
-				widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
-				self.W0 = kwargs.get('ws')[widx].T
-
-				self.Wall = [];
-				self.Wall.append(widx)
-			else:
-				self.W0 = np.tile(wt, self.J).reshape(self.J, model.n_state).T
-
-		# For metric tracking purposes.
-		try :
-			getattr(self, 'metrics')
-		except AttributeError:
-			# Storing metrics
-			self.radspec = []
-			self.metrics = dict()
-			self.metrics['self-bias'] = []			# Tracks collapse in parameter space
-			self.metrics['self-bias-data'] = []			# Tracks collapse after forward model evaln
-			self.metrics['bias-data'] = []			# Tracks data-fitting
-			self.metrics['bias'] = []			# Tracks the collapse towards the truth
-			self.metrics['t'] = []
+			self.choose_initial_conditions(model, **kwargs)
 
 		# Evolving the ensemble
 		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
-			if model.type == 'pde':
-				Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
-				if kwargs.get('update_wt', True):
-					if kwargs.get('ws', None) is not None:
-						widx = np.random.randint(kwargs.get('ws').shape[0], size = self.J)
-						self.Wall.append(widx)
-						self.W0 = kwargs.get('ws')[widx].T
-					else:
-						self.W0 = np.copy(Geval[self.n_obs:,:])
-			elif model.type == 'map':
-				Geval = self.ensemble_forward_model(U0, model)
-			else:
-				break # Raise an error
+			# Evaluates G for the ensemble
+			Geval = self.evaluate_ensemble_master(U0, model, **kwargs)
 
-			if trace:
+			if self.track_ensemble:
 				self.Uall.append(U0)
 				self.Gall.append(Geval)
 
+			# Retains the model evaluation and discards initial conditions (if pde)
 			Geval = Geval[:self.n_obs,:]
 
-			if   self.__update == 'eks':
-				U0 = self.ensemble_update(y_obs, U0, Geval, Gamma, i, **kwargs)
-			elif self.__update == 'eks-linear':
-				U0 = self.ensemble_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs)
-			elif self.__update == 'aldi':
-				U0 = self.ensemble_update_linear_reich(y_obs, U0, Geval, Gamma, i, **kwargs)
-			elif self.__update == 'eks-mix':
-				U0 = self.ensemble_update_mix(y_obs, U0, Geval, Gamma, i, **kwargs)
-			elif self.__update == 'eks-loo':
-				U0 = self.ensemble_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
+			U0 = self.update_ensemble_master(y_obs, U0, Geval, Gamma, i, **kwargs)
 
 			if save_online:
-				try:
-					getattr(self, 'nexp')
-					self.save(path = self.directory+'/ensembles/',
-							  file = model.model_name + '-eks-' + \
-							  			str(model.l_window).zfill(3)+ '-' + \
-										str(self.J).zfill(4)+ '-' + \
-										str(self.nexp).zfill(2) + '/',
-							  online = True, counter = i)
-				except AttributeError:
-					self.save(path = self.directory+'/ensembles/',
-							  file = model.model_name + '-eks-' + \
-							  			str(model.l_window).zfill(3)+ '-' + \
-										str(self.J).zfill(4) + '/',
-							  online = True, counter = i)
+				self.ensemble_save_online(model, i, **kwargs)
 
+			# Shall we continue to evolve the ensemble?
 			if self.metrics['t'][-1] > kwargs.get('t_tol', 2.):
 				break
 
 		# Evaluating at the final iteration
-		if model.type == 'pde':
-			Geval = self.ensemble_forward_solve(np.vstack([U0, self.W0]), model, t)
-			if kwargs.get('update_wt', True):
-				if kwargs.get('ws', None) is not None:
-					self.W0 = kwargs.get('ws')[np.random.randint(kwargs.get('ws').shape[0], size = self.J)].T
-				else:
-					self.W0 = Geval[self.n_obs:,:]
-		elif model.type == 'map':
-			Geval = self.ensemble_forward_model(U0, model)
+		Geval = self.evaluate_ensemble_master(U0, model, **kwargs)
 
 		# Updating ensemble tracking information.
-		if trace:
+		if self.track_ensemble:
 			self.Uall.append(U0)
 			self.Gall.append(Geval);
 
@@ -388,7 +369,7 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 		self.Ustar = U0
 		self.Gstar = Geval[:self.n_obs,:]
 
-		# File-storing ensemble instructions.
+		# File-storing ensemble directory.
 		try:
 			getattr(self, 'nexp')
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
@@ -396,6 +377,20 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 		except AttributeError:
 			self.online_path = self.directory+'/ensembles/'+model.model_name + \
 					'-' + str(self.J).zfill(4)+ '/'
+
+	def update_ensemble_master(self, y_obs, U0, Geval, Gamma, i, **kwargs):
+		if   self.__update == 'eks':
+			U0 = self.ensemble_update(y_obs, U0, Geval, Gamma, i, **kwargs)
+		elif self.__update == 'eks-linear':
+			U0 = self.ensemble_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs)
+		elif self.__update == 'aldi':
+			U0 = self.ensemble_update_linear_reich(y_obs, U0, Geval, Gamma, i, **kwargs)
+		elif self.__update == 'eks-mix':
+			U0 = self.ensemble_update_mix(y_obs, U0, Geval, Gamma, i, **kwargs)
+		elif self.__update == 'eks-loo':
+			U0 = self.ensemble_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
+
+		return U0
 
 	def ensemble_update(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
