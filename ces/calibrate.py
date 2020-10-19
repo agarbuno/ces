@@ -653,11 +653,23 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 		lower_LM = rho_LM * np.linalg.norm(np.linalg.solve(Jnoise, Gmean - y_obs[:,np.newaxis]))
 		alpha = 5.
 
-		upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
+		upper_LM = alpha * np.linalg.norm(
+					np.matmul(Jnoise,
+							np.linalg.solve(Cpp + alpha * Gamma,
+								Gmean - y_obs[:,np.newaxis]
+						)
+					)
+				)
 
 		while upper_LM < lower_LM:
 			alpha = 2 * alpha
-			upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
+			upper_LM = alpha * np.linalg.norm(
+						np.matmul(Jnoise,
+								np.linalg.solve(Cpp + alpha * Gamma,
+									Gmean - y_obs[:,np.newaxis]
+							)
+						)
+					)
 
 		return 1./alpha
 
