@@ -175,7 +175,19 @@ class EnsembleKalmanMethod:
 		elif model.type == 'map':
 			Geval = self.ensemble_forward_model(U0, model)
 
+		if self.track_ensemble:
+			self.Uall.append(U0)
+			self.Gall.append(Geval)
+
 		return Geval
+
+	def postprocess_ensemble(self, U0, Geval):
+		if self.track_ensemble:
+			self.Uall = np.asarray(self.Uall);
+			self.Gall = np.array(self.Gall)
+
+		self.Ustar = U0
+		self.Gstar = Geval[:self.n_obs,:]
 
 
 	def save(self, path = './', file = 'ces/', all = False, reset = True, online = False, counter = 0):
@@ -253,21 +265,22 @@ class EnsembleKalmanMethod:
 		except AttributeError:
 			self.directory = os.getcwd()
 
-	def ensemble_save_online(self, model, iteration, **kwargs):
-		try:
-			getattr(self, 'nexp')
-			self.save(path = self.directory+'/ensembles/',
-					  file = model.model_name + '-eks-' + \
-					  			str(model.l_window).zfill(3)+ '-' + \
-								str(self.J).zfill(4)+ '-' + \
-								str(self.nexp).zfill(2) + '/',
-					  online = True, counter = iteration)
-		except AttributeError:
-			self.save(path = self.directory+'/ensembles/',
-					  file = model.model_name + '-eks-' + \
-					  			str(model.l_window).zfill(3)+ '-' + \
-								str(self.J).zfill(4) + '/',
-					  online = True, counter = iteration)
+	def ensemble_save_online(self, model, iteration, save_online, **kwargs):
+		if save_online:
+			try:
+				getattr(self, 'nexp')
+				self.save(path = self.directory+'/ensembles/',
+						  file = model.model_name + '-eks-' + \
+						  			str(model.l_window).zfill(3)+ '-' + \
+									str(self.J).zfill(4)+ '-' + \
+									str(self.nexp).zfill(2) + '/',
+						  online = True, counter = iteration)
+			except AttributeError:
+				self.save(path = self.directory+'/ensembles/',
+						  file = model.model_name + '-eks-' + \
+						  			str(model.l_window).zfill(3)+ '-' + \
+									str(self.J).zfill(4) + '/',
+						  online = True, counter = iteration)
 
 # ------------------------------------------------------------------------------
 
@@ -338,18 +351,13 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 		for i in tqdm(range(self.T), desc = 'EKS iterations (%s):'%str(self.J), position = 1):
 			# Evaluates G for the ensemble
 			Geval = self.evaluate_ensemble_master(U0, model, **kwargs)
-
-			if self.track_ensemble:
-				self.Uall.append(U0)
-				self.Gall.append(Geval)
-
 			# Retains the model evaluation and discards initial conditions (if pde)
 			Geval = Geval[:self.n_obs,:]
 
 			U0 = self.update_ensemble_master(y_obs, U0, Geval, Gamma, i, **kwargs)
 
-			if save_online:
-				self.ensemble_save_online(model, i, **kwargs)
+			# Save the ensemble as it evolves
+			self.ensemble_save_online(model, i, save_online, **kwargs)
 
 			# Shall we continue to evolve the ensemble?
 			if self.metrics['t'][-1] > kwargs.get('t_tol', 2.):
@@ -358,16 +366,8 @@ class EnsembleKalmanSampler(EnsembleKalmanMethod):
 		# Evaluating at the final iteration
 		Geval = self.evaluate_ensemble_master(U0, model, **kwargs)
 
-		# Updating ensemble tracking information.
-		if self.track_ensemble:
-			self.Uall.append(U0)
-			self.Gall.append(Geval);
-
-			self.Uall = np.asarray(self.Uall);
-			self.Gall = np.array(self.Gall)
-
-		self.Ustar = U0
-		self.Gstar = Geval[:self.n_obs,:]
+		# Finalize ensemble path
+		self.postprocess_ensemble(U0, Geval)
 
 		# File-storing ensemble directory.
 		try:
