@@ -411,6 +411,7 @@ class sampling(enka):
 		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
 
 		hk = self.timestep_method(D, Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
+
 		if kwargs.get('time_step', None) in ['adaptive', 'constant']:
 			Cpp = np.cov(Geval, bias = True)
 			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
