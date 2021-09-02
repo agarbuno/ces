@@ -5,10 +5,11 @@ from scipy import integrate
 class lineal(object):
 	"""
 	"""
-	def __init__(self, A, flag_noise = False):
+	def __init__(self, A,  b = 0, flag_noise = False):
 		"""
 		"""
 		self.A = A
+		self.b = b
 		self.n_obs = A.shape[0]
 		self.flag_noise = flag_noise
 		self.noise_sigma = np.sqrt(0.1)
@@ -25,9 +26,9 @@ class lineal(object):
 		"""
 		"""
 		if self.flag_noise:
-			return np.matmul(self.A, theta) + self.noise_sigma * np.random.normal()
+			return np.matmul(self.A, theta) + self.b + self.noise_sigma * np.random.normal()
 		else:
-			return np.matmul(self.A, theta)
+			return np.matmul(self.A, theta) + self.b
 
 class lineal_log(lineal):
 	def __init__(self, A, flag_noise = False):
@@ -58,7 +59,7 @@ class elliptic(object):
 		self.x1 = 1./4
 		self.x2 = 3./4
 		self.flag_noise = flag_noise
-		self.sigma      = np.sqrt(0.1)
+		self.sigma      = np.sqrt(0.01)
 		self.model_name = 'elliptic'
 		self.type       = 'map'
 
@@ -72,9 +73,14 @@ class elliptic(object):
 		"""
 		"""
 		u1, u2 = theta
-		x = (u2 * self.x1) + (np.exp(-u1) * (-self.x1**2+self.x1) * 0.5) + (self.flag_noise * self.sigma * np.random.normal())
-		y = (u2 * self.x2) + (np.exp(-u1) * (-self.x2**2+self.x2) * 0.5) + (self.flag_noise * self.sigma * np.random.normal())
 
+		x = (u2 * self.x1) + (np.exp(-u1) * (-self.x1**2+self.x1) * 0.5)
+		y = (u2 * self.x2) + (np.exp(-u1) * (-self.x2**2+self.x2) * 0.5)
+
+		if self.flag_noise:
+			x += (self.sigma * np.random.normal(size = len(u1)))
+			y += (self.sigma * np.random.normal(size = len(u2)))
+			
 		if dG:
 			DG = np.array([[-np.exp(-u1) * (-self.x1**2+self.x1) * 0.5, self.x1],
 						   [-np.exp(-u1) * (-self.x2**2+self.x2) * 0.5, self.x2]])
