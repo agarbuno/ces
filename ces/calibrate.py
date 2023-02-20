@@ -3,9 +3,7 @@ import os
 import pickle
 import numpy as np
 import pandas as pd
-# import gpflow as gp
 
-# from tqdm import tqdm
 from tqdm.autonotebook import tqdm
 from scipy import integrate
 from joblib import Parallel, delayed
@@ -135,7 +133,7 @@ class enka(object):
 		"""
 		Forward model for PDE constrained inverse problem. If parallel is set to
 		true, then it uses the available cores as initialized with the enka object.
-		(WARNING): Hope to be more general now!
+		(WARNING): Lots of improvement needed
 
 		Inputs:
 			- k: [p + n_state, ], p is the dimensionality of the parameters, n_state
@@ -244,6 +242,7 @@ class sampling(enka):
 
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
+        Ensemble Kalman Sampler (EKS)
 		Find the minimizer of an inverse problem using the continuous time limit
 		of the EKnF. The update can selected from a range of options.
 
@@ -275,7 +274,7 @@ class sampling(enka):
 		except AttributeError:
 			self.directory = os.getcwd()
 
-		self.__update = kwargs.get('update', 'eks')
+		self.__update = kwargs.get('update', 'aldi')
 
 		if trace:
 			try:
@@ -333,16 +332,14 @@ class sampling(enka):
 
 			Geval = Geval[:self.n_obs,:]
 
+            # I cannot remember what I did at this point (4 yrs later). But the default
+            # should be the ALDI version of the updates
 			if   self.__update == 'eks':
 				U0 = self.eks_update(y_obs, U0, Geval, Gamma, i, **kwargs)
-			elif self.__update == 'eks-linear':
-				U0 = self.eks_update_linear(y_obs, U0, Geval, Gamma, i, **kwargs)
 			elif self.__update == 'aldi':
-				U0 = self.eks_update_linear_reich(y_obs, U0, Geval, Gamma, i, **kwargs)
-			elif self.__update == 'eks-mix':
-				U0 = self.eks_update_mix(y_obs, U0, Geval, Gamma, i, **kwargs)
-			elif self.__update == 'eks-loo':
-				U0 = self.eks_update_loo(y_obs, U0, Geval, Gamma, i, **kwargs)
+				U0 = self.eks_update_aldi(y_obs, U0, Geval, Gamma, i, **kwargs)
+            elif self.__update == 'aldi_constant':
+				U0 = self.eks_update_aldi_constant(y_obs, U0, Geval, Gamma, i, **kwargs)
 
 			if save_online:
 				try:
@@ -424,7 +421,7 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_linear(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+    def eks_update_aldi(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
 		"""
 		Ensemble update based on the continuous time limit of the EKS.
 		ALDI's linear correction.
@@ -456,22 +453,6 @@ class sampling(enka):
 			print(self.metrics['t'][-1])
 		alpha_J = ((self.p + 1.)/self.J)
 
-		# ------------------     Implicit prior term  --------------------------
-		# Ustar_ = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-		# 	U0 - hk * np.matmul(U0 - Umean, D)  + \
-		# 	hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) + \
-		# 	1.0 * hk * alpha_J * (U0 - Umean))
-		# Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-		# 	np.random.normal(0, 1, [self.p, self.J])))
-
-		# ------------------     Implicit prior linear / term ------------------
-		# Ustar_ = np.linalg.solve( (1 - hk * alpha_J) * np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov.T).T,
-		# 	U0 - hk * np.matmul(U0 - Umean, D)  + \
-		# 	hk * np.matmul(Ucov, np.linalg.solve(self.sigma, self.mu)) - \
-		# 	hk * alpha_J * Umean)
-		# Uk     = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov),
-		# 	np.random.normal(0, 1, [self.p, self.J])))
-
 		# ------------------     Explicit as it can get ------------------------
 		Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
 			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
@@ -481,10 +462,11 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_linear_reich(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
-		"""
+    def eks_update_aldi_constant(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
+        """
 		Ensemble update based on the continuous time limit of the EKS.
 		ALDI's linear correction.
+        *NOTE*: It does not use an adaptive timestepping method. 
 		"""
 		self.update_rule = 'eks_update_aldi'
 
@@ -519,142 +501,6 @@ class sampling(enka):
 
 		return Uk
 
-	def eks_update_mix(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
-		"""
-		Ensemble update based on the continuous time limit of the EKS.
-		ALDI's linear correction.
-		"""
-		self.update_rule = 'eks_update_mix'
-		eta_p   = np.random.normal(0, 1, [self.p, self.J])
-		eta_d   = np.random.normal(0, 1, [self.n_obs, self.J])
-		Umean = U0.mean(axis = 1)[:, np.newaxis]
-		Ucov  = np.cov(U0) + 1e-8 * np.identity(self.p)
-
-		# For ensemble update
-		E = Geval - Geval.mean(axis = 1)[:,np.newaxis]
-		R = Geval - y_obs[:,np.newaxis]
-		D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(Gamma, R))
-
-		# Track metrics
-		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-
-		hk = self.timestep_method(D,  Geval, y_obs, Gamma, np.linalg.cholesky(Gamma), **kwargs)
-		if kwargs.get('time_step', None) in ['adaptive', 'constant']:
-			Cpp = np.cov(Geval, bias = True)
-			Cup = (1./self.J) * np.matmul(U0 - Umean, E.T)
-			D =  (1.0/self.J) * np.matmul(E.T, np.linalg.solve(hk * Cpp + Gamma, R))
-
-		s_beta  = 1.0
-		s_alpha = 0.01
-		alpha_t = 1./(1.+np.exp(-(self.metrics['t'][-1] - s_beta)/s_alpha))
-		alpha_J = ((self.p + 1.)/self.J)
-
-		Uk = U0 - hk * np.matmul(U0 - Umean, D) - \
-			hk * np.matmul(Ucov, np.linalg.solve(self.sigma, U0 - self.mu)) + \
-			hk * alpha_J * (U0 - Umean) + \
-			np.sqrt(2 * hk * alpha_t)   * np.matmul(np.linalg.cholesky(Ucov), eta_p) + \
-			np.sqrt(hk * (1 - alpha_t)) * np.matmul(Cup, np.linalg.solve( hk * Cpp + Gamma,
-				np.matmul(np.linalg.cholesky(Gamma), eta_d)
-				)
-			)
-
-		return Uk
-
-	def eks_update_loo(self, y_obs, U0, Geval, Gamma, iter, **kwargs):
-		"""
-		Ensemble update based on the continuous time limit of the EKS.
-		LOO: Leave-One-Out
-		"""
-		eta     = np.random.normal(0, 1, [self.p, self.J])
-		Umean   = U0.mean(axis = 1)[:, np.newaxis]
-		Gmean   = Geval.mean(axis = 1)[:,np.newaxis]
-		Ucov    = np.cov(U0) + 1e-8 * np.identity(self.p)
-		alpha   = 1./self.J
-		D_bar   = np.zeros((self.J - 1, self.J))
-		idx     = np.arange(self.J)
-		R       = Geval - y_obs[:,np.newaxis]
-		Gamma_R = np.linalg.solve(Gamma, R)
-
-		# 1) Build D_bar
-		for j in range(self.J):
-			Gmean_j    = 1/(1-alpha) * np.copy(Gmean - alpha * Geval[:,j].reshape(-1,1))
-			E_j        = np.copy(Geval[:, idx != j] - Gmean_j)
-			D_bar[:,j] = 1/(self.J-1) * np.matmul(E_j.T, Gamma_R[:,j])
-		self.D_bar = D_bar
-
-		# 2) Compute norm of D_bar
-		norm_D = np.linalg.norm(D_bar)
-		# norm_D = np.sqrt(self.J * (D_bar**2).sum(axis = 1).mean())
-		hk     = 1./(norm_D + 1e-8)
-
-		# 3) Update ensemble members
-		Uk = np.zeros_like(U0)
-		for j in range(self.J):
-			Gmean_j = 1/(1-alpha) * np.copy(Gmean - alpha * Geval[:,j].reshape(-1,1))
-			Umean_j = 1/(1-alpha) * np.copy(Umean - alpha * U0[:,j].reshape(-1,1))
-			delta_j = U0[:,j].reshape(-1,1) - Umean_j
-			Ucov_j  = 1/(1-alpha) * Ucov - alpha * delta_j.dot(delta_j.T)
-			Ustar_  = np.linalg.solve(np.eye(self.p) + hk * np.linalg.solve(self.sigma.T, Ucov_j.T).T,
-				U0[:,j].reshape(-1,1) - hk * np.matmul(U0[:,idx != j] - Umean_j, D_bar[:,j].reshape(-1,1)) + \
-				hk * np.matmul(Ucov_j, np.linalg.solve(self.sigma, self.mu)))
-			Uk[:,j] = (Ustar_ + np.sqrt(2*hk) * np.matmul( np.linalg.cholesky(Ucov_j), eta[:,j].reshape(-1,1))).flatten()
-
-		# 4) Build metrics
-		self.metrics['self-bias'].append(((U0 - U0.mean(axis = 1)[:, np.newaxis])**2).sum(axis = 0).mean())
-		self.metrics['bias'].append(((U0 - self.ustar)**2).sum(axis = 0).mean())
-		# self.metrics['self-bias-data'].append((np.diag(np.matmul(E.T, np.linalg.solve(Gamma, E)))**2).mean())
-		# self.metrics['bias-data'].append((np.diag(np.matmul(R.T, np.linalg.solve(Gamma, R)))**2).mean())
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
-
-		return Uk
-
-	def timestep_method(self, D, Geval, y_obs, Gamma, Jnoise, **kwargs):
-		if kwargs.get('time_step', None) is None:
-			hk = 1./(np.linalg.norm(D) + 1e-8)
-			# self.radspec.append(np.linalg.eigvals(D).real.max())
-			# hk = 1./self.radspec[-1]
-		elif kwargs.get('time_step') == 'spectral':
-			self.radspec.append(np.linalg.eigvals(D).real.max())
-			hk = 1./self.radspec[-1]
-		elif kwargs.get('time_step') == 'constant':
-			hk = kwargs.get('delta_t', 1./(self.T/2))
-		elif kwargs.get('time_step') == 'adaptive':
-			hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
-		elif kwargs.get('time_step') == 'mix':
-			if len(self.metrics['t']) == 0 or self.metrics['t'][-1] < kwargs.get('spinup', 4.):
-				hk = 1./(np.linalg.norm(D) + 1e-8)
-			else:
-				hk = kwargs.get('delta_t', 1./(self.T/2))
-
-		if len(self.Uall) == 1:
-			self.metrics['t'].append(hk)
-		else:
-			self.metrics['t'].append(hk + self.metrics['t'][-1])
-
-		return hk
-
-	def LM_procedure(self, Geval, y_obs, Gamma, Jnoise, **kwargs):
-		rho_LM = kwargs.get('rho_LM', .5)
-
-		Cpp   = np.cov(Geval, bias = True)
-		Gmean = Geval.mean(axis = 1)
-
-		lower_LM = rho_LM * np.linalg.norm(np.linalg.solve(Jnoise, Gmean - y_obs[:,np.newaxis]))
-		alpha = 5.
-
-		upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
-
-		while upper_LM < lower_LM:
-			alpha = 2 * alpha
-			upper_LM = alpha * np.linalg.norm(np.matmul(Jnoise, np.linalg.solve(Cpp + alpha * Gamma, Gmean - y_obs[:,np.newaxis])))
-
-		return 1./alpha
 
 # ------------------------------------------------------------------------------
 
