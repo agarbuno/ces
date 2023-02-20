@@ -8,9 +8,12 @@ To import the module into a python script or project, type
 
 ```
 import sys
-sys.path.append('Your path/ipuq/')
+sys.path.append(<your path/ces/>)
 
+# to load test cases 
 from ces.utils import *
+
+# to load the calibration code (EKS)
 from ces.calibrate import *
 ```
 ---
