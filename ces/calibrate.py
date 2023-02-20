@@ -240,6 +240,33 @@ class enka(object):
 
 class sampling(enka):
 
+    def timestep_method(self, D, Geval, y_obs, Gamma, Jnoise, **kwargs):
+        """
+        Timestepping variants for the EKS run.
+        """
+		if kwargs.get('time_step', None) is None:
+			hk = 1./(np.linalg.norm(D) + 1e-8)
+		elif kwargs.get('time_step') == 'spectral':
+			self.radspec.append(np.linalg.eigvals(D).real.max())
+			hk = 1./self.radspec[-1]
+		elif kwargs.get('time_step') == 'constant':
+			hk = kwargs.get('delta_t', 1./(self.T/2))
+		elif kwargs.get('time_step') == 'adaptive':
+			hk = self.LM_procedure(Geval, y_obs, Gamma, Jnoise, **kwargs)
+		elif kwargs.get('time_step') == 'mix':
+			if len(self.metrics['t']) == 0 or self.metrics['t'][-1] < kwargs.get('spinup', 4.):
+				hk = 1./(np.linalg.norm(D) + 1e-8)
+			else:
+				hk = kwargs.get('delta_t', 1./(self.T/2))
+
+		if len(self.Uall) == 1:
+			self.metrics['t'].append(hk)
+		else:
+			self.metrics['t'].append(hk + self.metrics['t'][-1])
+
+		return hk
+
+
 	def run(self, y_obs, U0, model, Gamma, Jnoise, save_online = False, trace = True, **kwargs):
 		"""
         Ensemble Kalman Sampler (EKS)

@@ -1,6 +1,6 @@
 Tools for Ensemble Kalman Inversion (EKI), Ensemble Kalman Sampler (EKS) and
-Gaussian Process Emulation (using `Gpflow`) for Uncertainty Quantification and
-Inverse Problems.
+Gaussian Process Emulation (using `Gpflow`) for Uncertainty Quantification in 
+inverse problems.
 
 **Note**: Examples can be found as jupyter notebooks.
 
@@ -20,9 +20,9 @@ Overview of this module:
 - `utils` contains the additional tools for running the examples. Like test functions,
 and PDEs constrained functions. The goal is to solve inverse problems through an approximate Bayesian method.  
 
-Coming shortly:
-- MCMC
-- Accelerated MCMC using GPs.
+The provided code can be used for the following:
+- MCMC through Metropolis Hastings. 
+- Accelerated MCMC using GPs as surrogate models.
 
 Dependencies:
 - tqdm
@@ -34,7 +34,9 @@ Dependencies:
 ---
 
 References:
-- Garbuno-Inigo, A., Hoffmann, F., Li, W., & Stuart, A. M. _Interacting Langevin Diffusions: Gradient Structure And Ensemble Kalman Approximation_.
 
-- Iglesias et al. _Ensemble Kalman methods for inverse problems._ Inverse
-Problems 29.
+- Garbuno-Inigo, A., Nüsken, N., & Reich, S. (2020). _Affine invariant interacting Langevin dynamics for Bayesian inference_. SIAM Journal on Applied Dynamical Systems, 19(3), 1633-1658.
+
+- Garbuno-Inigo, A., Hoffmann, F., Li, W., & Stuart, A. M. (2020). _Interacting Langevin diffusions: Gradient structure and ensemble Kalman sampler_. SIAM Journal on Applied Dynamical Systems, 19(1), 412-441.
+
+- Iglesias, M. A., Law, K. J., & Stuart, A. M. (2013). _Ensemble Kalman methods for inverse problems_. Inverse Problems, 29(4), 045001.
