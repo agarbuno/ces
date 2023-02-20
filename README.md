@@ -1,3 +1,5 @@
+# *C*alibrate *E*mulate *S*ample (CES)
+
 Tools for Ensemble Kalman Inversion (EKI), Ensemble Kalman Sampler (EKS) and
 Gaussian Process Emulation (using `Gpflow`) for Uncertainty Quantification in 
 inverse problems.
