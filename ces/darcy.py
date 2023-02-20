@@ -46,7 +46,7 @@ class model(object):
 			# THIS SPECIFIES A DEFAULT IN MY MACHINE.
 			self.eng.addpath(r'./../mfiles','-end');
 		else:
-			# ELSE USE THE PATH SPECIFIED BY USER.
+			# USE THE PATH SPECIFIED BY USER.
 			self.eng.addpath(mpath,'-end');
 
 	def stop(self):
