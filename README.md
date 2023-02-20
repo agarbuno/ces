@@ -20,7 +20,7 @@ from ces.calibrate import *
 ```
 ---
 
-Overview of this module:
+## Overview:
 - `enka` contains the ensemble Kalman algorithms.
 - `utils` contains the additional tools for running the examples. Like test functions,
 and PDEs constrained functions. The goal is to solve inverse problems through an approximate Bayesian method.  
@@ -38,7 +38,7 @@ Dependencies:
 
 ---
 
-References:
+## References:
 
 - Garbuno-Inigo, A., Nüsken, N., & Reich, S. (2020). _Affine invariant interacting Langevin dynamics for Bayesian inference_. SIAM Journal on Applied Dynamical Systems, 19(3), 1633-1658.
 
