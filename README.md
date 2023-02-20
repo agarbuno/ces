@@ -6,7 +6,7 @@ inverse problems.
 
 To import the module into a python script or project, type
 
-```
+```python
 import sys
 sys.path.append(<your path/ces/>)
 
