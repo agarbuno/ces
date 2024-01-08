@@ -4,7 +4,7 @@ Tools for Ensemble Kalman Inversion (EKI), Ensemble Kalman Sampler (EKS) and
 Gaussian Process Emulation (using `Gpflow`) for Uncertainty Quantification in 
 inverse problems.
 
-**Note**: **_Outdated_** examples can be found as jupyter notebooks.
+⚠️ **Note**: **_Outdated_** examples can be found as jupyter notebooks.⚠️
 
 To import the module into a python script or project, type
 
